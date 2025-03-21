@@ -3,7 +3,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session,Mapped
 from database import get_db
 from models.user import User
 from pydantic import BaseModel
@@ -24,8 +24,6 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: str | None = None
 
-class UserInDB(User):
-    hashed_password: str
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)

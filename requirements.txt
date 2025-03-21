@@ -8,3 +8,11 @@ sqlalchemy
 alembic
 redis
 transformers
+passlib
+python-jose
+python-multipart
+cachetools
+pytest
+pytest-cov
+httpx
+bcrypt
