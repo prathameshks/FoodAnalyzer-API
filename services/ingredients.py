@@ -16,18 +16,41 @@ def fetch_ingredient_data_from_api(name: str) -> Dict[str, Any]:
     response = requests.get(url)
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=f"Failed to fetch data for ingredient {name}")
-    return response.json()
+    data = response.json()
+    return {
+        "nutritional_info": data.get("nutritional_info", {}),
+        "description": data.get("description", ""),
+        "origin": data.get("origin", ""),
+        "allergens": data.get("allergens", ""),
+        "vegan": data.get("vegan", False),
+        "vegetarian": data.get("vegetarian", False)
+    }
 
 def get_ingredient_data(db: Session, name: str) -> Dict[str, Any]:
     ingredient = get_ingredient_by_name(db, name)
     if ingredient:
-        return ingredient.nutritional_info
+        return {
+            "nutritional_info": ingredient.nutritional_info,
+            "description": ingredient.description,
+            "origin": ingredient.origin,
+            "allergens": ingredient.allergens,
+            "vegan": ingredient.vegan,
+            "vegetarian": ingredient.vegetarian
+        }
     data = fetch_ingredient_data_from_api(name)
     save_ingredient_data(db, name, data)
     return data
 
 def save_ingredient_data(db: Session, name: str, data: Dict[str, Any]):
-    ingredient = Ingredient(name=name, nutritional_info=data)
+    ingredient = Ingredient(
+        name=name,
+        nutritional_info=data.get("nutritional_info", {}),
+        description=data.get("description", ""),
+        origin=data.get("origin", ""),
+        allergens=data.get("allergens", ""),
+        vegan=data.get("vegan", False),
+        vegetarian=data.get("vegetarian", False)
+    )
     db.add(ingredient)
     db.commit()
     db.refresh(ingredient)

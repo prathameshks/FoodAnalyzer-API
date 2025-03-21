@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from utils import fetch_product_data_from_api, save_json_file
+from utils.fetch_data import fetch_product_data_from_api
+from utils.file_operations import save_json_file
 from models.ingredient import Ingredient
+from models.product import Product
 from services.ingredients import get_ingredient_by_name, save_ingredient_data, fetch_ingredient_data_from_api
 from typing import Dict, Any
 import json
@@ -85,6 +87,32 @@ def process_data(db: Session, barcode: str) -> Dict[str, Any]:
     data = clean_data(data)
     data = standardize_data(data)
     data = enrich_data(db, data)
+    
+    # Save product details in the Product model
+    product = Product(
+        product_name=data["product_name"],
+        generic_name=data["generic_name"],
+        brands=data["brands"],
+        ingredients=data["ingredients"],
+        ingredients_text=data["ingredients_text"],
+        ingredients_analysis=data["ingredients_analysis"],
+        nutriscore=data["nutriscore"],
+        nutrient_levels=data["nutrient_levels"],
+        nutriments=data["nutriments"],
+        data_quality_warnings=data["data_quality_warnings"]
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    
+    # Save ingredient details in the Ingredient model
+    for ingredient in data["ingredients"]:
+        ingredient_data = get_ingredient_by_name(db, ingredient["text"])
+        if not ingredient_data:
+            ingredient_data = fetch_ingredient_data_from_api(ingredient["text"])
+            save_ingredient_data(db, ingredient["text"], ingredient_data)
+        ingredient["nutritional_info"] = ingredient_data
+    
     save_json_file(barcode, data)
     return data
 
