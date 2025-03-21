@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 from sqlalchemy.orm import Session
 from services.ai_agent import preprocess_data, validate_data, clean_data, standardize_data, enrich_data, process_data, integrate_hugging_face_transformers
+from models.product import Product
+from models.ingredient import Ingredient
 
 class TestAIAgentService(unittest.TestCase):
 
@@ -142,6 +144,59 @@ class TestAIAgentService(unittest.TestCase):
         mock_pipeline.return_value = lambda text: [{'sequence': 'Test sequence'}]
         result = integrate_hugging_face_transformers('test_model', 'Test text')
         self.assertEqual(result, 'Test sequence')
+
+    @patch('services.ai_agent.get_ingredient_by_name')
+    @patch('services.ai_agent.fetch_ingredient_data_from_api')
+    @patch('services.ai_agent.save_ingredient_data')
+    def test_process_data_saves_ingredient_details(self, mock_save_ingredient_data, mock_fetch_ingredient_data_from_api, mock_get_ingredient_by_name):
+        db = MagicMock(spec=Session)
+        mock_get_ingredient_by_name.return_value = None
+        mock_fetch_ingredient_data_from_api.return_value = {'nutritional_info': 'Test Info'}
+        data = {
+            'product_name': 'Test Product',
+            'generic_name': 'Test Generic',
+            'brands': 'Test Brand',
+            'ingredients': [
+                {
+                    'text': 'Test Ingredient',
+                    'sub_ingredients': []
+                }
+            ],
+            'ingredients_text': 'Test Ingredients Text',
+            'ingredients_analysis': {},
+            'nutriscore': {},
+            'nutrient_levels': {},
+            'nutriments': {},
+            'data_quality_warnings': []
+        }
+        with patch('services.ai_agent.preprocess_data', return_value=data), \
+             patch('services.ai_agent.validate_data', return_value=True), \
+             patch('services.ai_agent.clean_data', return_value=data), \
+             patch('services.ai_agent.standardize_data', return_value=data), \
+             patch('services.ai_agent.enrich_data', return_value=data):
+            result = process_data(db, 'test_barcode')
+            self.assertEqual(result['product_name'], 'Test Product')
+            mock_save_ingredient_data.assert_called_once_with(db, 'Test Ingredient', {'nutritional_info': 'Test Info'})
+
+    @patch('services.ai_agent.preprocess_data')
+    @patch('services.ai_agent.validate_data')
+    @patch('services.ai_agent.clean_data')
+    @patch('services.ai_agent.standardize_data')
+    @patch('services.ai_agent.enrich_data')
+    @patch('services.ai_agent.save_json_file')
+    def test_process_data_saves_product_details(self, mock_save_json_file, mock_enrich_data, mock_standardize_data, mock_clean_data, mock_validate_data, mock_preprocess_data):
+        db = MagicMock(spec=Session)
+        mock_preprocess_data.return_value = {'product_name': 'Test Product'}
+        mock_validate_data.return_value = True
+        mock_clean_data.return_value = {'product_name': 'Test Product'}
+        mock_standardize_data.return_value = {'product_name': 'Test Product'}
+        mock_enrich_data.return_value = {'product_name': 'Test Product'}
+        result = process_data(db, 'test_barcode')
+        self.assertEqual(result['product_name'], 'Test Product')
+        mock_save_json_file.assert_called_once_with('test_barcode', {'product_name': 'Test Product'})
+        db.add.assert_called_once()
+        db.commit.assert_called_once()
+        db.refresh.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
