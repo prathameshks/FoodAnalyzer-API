@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from sqlalchemy.orm import Session
-from services.ai_agent import preprocess_data, validate_data, clean_data, standardize_data, enrich_data, process_data
+from services.ai_agent import preprocess_data, validate_data, clean_data, standardize_data, enrich_data, process_data, integrate_hugging_face_transformers
 
 class TestAIAgentService(unittest.TestCase):
 
@@ -136,6 +136,12 @@ class TestAIAgentService(unittest.TestCase):
         result = process_data(db, 'test_barcode')
         self.assertEqual(result['product_name'], 'Test Product')
         mock_save_json_file.assert_called_once_with('test_barcode', {'product_name': 'Test Product'})
+
+    @patch('services.ai_agent.pipeline')
+    def test_integrate_hugging_face_transformers(self, mock_pipeline):
+        mock_pipeline.return_value = lambda text: [{'sequence': 'Test sequence'}]
+        result = integrate_hugging_face_transformers('test_model', 'Test text')
+        self.assertEqual(result, 'Test sequence')
 
 if __name__ == '__main__':
     unittest.main()
