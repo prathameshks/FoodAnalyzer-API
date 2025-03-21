@@ -1,3 +1,70 @@
-# Module 2
+# FoodAnalyzer-API
 
-## API END POINT TO PROCESS PRODUCT DATA AND RETURN RESPONSE
+## Installation and Setup
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/prathameshks/FoodAnalyzer-API.git
+   ```
+
+2. **Navigate to the project directory**:
+   ```bash
+   cd FoodAnalyzer-API
+   ```
+
+3. **Create a virtual environment**:
+   ```bash
+   python -m venv venv
+   ```
+
+4. **Activate the virtual environment**:
+   - On Windows:
+     ```bash
+     venv\Scripts\activate
+     ```
+   - On macOS/Linux:
+     ```bash
+     source venv/bin/activate
+     ```
+
+5. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+6. **Set up environment variables**:
+   Copy the `.env.example` file to `.env` and fill in the required values, including API keys for Hugging Face Transformers.
+
+7. **Run the application**:
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+## API Endpoints
+
+### Authentication
+- `POST /api/register`: Register a new user.
+- `POST /api/login`: Login and obtain an access token.
+- `GET /api/users/me`: Get the current user's information.
+
+### Ingredient Analysis
+- `POST /api/analyze_ingredients`: Analyze a list of ingredients.
+- `GET /api/personalized_recommendations`: Get personalized ingredient recommendations.
+
+### Scan History
+- `POST /api/scan`: Record a new scan.
+- `GET /api/history/{user_id}`: Retrieve the scan history for a user.
+
+### Product Data
+- `GET /api/extract_product_info`: Extract product information from a barcode.
+- `POST /api/fetch_product_data`: Fetch product data for a list of barcodes.
+
+## Environment Variables 
+
+### Hugging Face Transformers API key
+Obtain a free API key from Hugging Face by signing up on their website. Add the API key to the `.env` file with the variable name `HUGGING_FACE_API_KEY`.
+
+Example:
+```env
+HUGGING_FACE_API_KEY=your_api_key_here  # Get your API key from https://huggingface.co
+```
