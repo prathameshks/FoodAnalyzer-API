@@ -2,6 +2,8 @@ import json
 import os
 import requests
 from fastapi import HTTPException
+import cv2
+import pytesseract
 
 def fetch_product_data_from_api(barcode):
     url = f"https://india.openfoodfacts.org/api/v2/product/{barcode}.json"
@@ -15,3 +17,20 @@ def save_json_file(item, data):
     with open(f"v2/{item}.json", "w") as file:
         json.dump(data, file)
     print(f"Saved {item}.json")
+
+def extract_text_from_image(image_path):
+    image = cv2.imread(image_path)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.medianBlur(gray, 3)
+    text = pytesseract.image_to_string(gray)
+    return text
+
+def detect_barcode_from_image(image_path):
+    image = cv2.imread(image_path)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.medianBlur(gray, 3)
+    detector = cv2.QRCodeDetector()
+    data, bbox, _ = detector.detectAndDecode(gray)
+    if bbox is not None:
+        return data
+    return None
