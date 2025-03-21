@@ -11,19 +11,47 @@ class TestIngredientService(unittest.TestCase):
     def test_get_ingredient_data(self, mock_save_ingredient_data, mock_fetch_ingredient_data_from_api, mock_get_ingredient_by_name):
         db = MagicMock(spec=Session)
         mock_get_ingredient_by_name.return_value = None
-        mock_fetch_ingredient_data_from_api.return_value = {"name": "test_ingredient", "nutritional_info": "test_info"}
+        mock_fetch_ingredient_data_from_api.return_value = {
+            "nutritional_info": "test_info",
+            "description": "test_description",
+            "origin": "test_origin",
+            "allergens": "test_allergens",
+            "vegan": True,
+            "vegetarian": True
+        }
 
         result = get_ingredient_data(db, "test_ingredient")
 
         mock_get_ingredient_by_name.assert_called_once_with(db, "test_ingredient")
         mock_fetch_ingredient_data_from_api.assert_called_once_with("test_ingredient")
-        mock_save_ingredient_data.assert_called_once_with(db, "test_ingredient", {"name": "test_ingredient", "nutritional_info": "test_info"})
-        self.assertEqual(result, {"name": "test_ingredient", "nutritional_info": "test_info"})
+        mock_save_ingredient_data.assert_called_once_with(db, "test_ingredient", {
+            "nutritional_info": "test_info",
+            "description": "test_description",
+            "origin": "test_origin",
+            "allergens": "test_allergens",
+            "vegan": True,
+            "vegetarian": True
+        })
+        self.assertEqual(result, {
+            "nutritional_info": "test_info",
+            "description": "test_description",
+            "origin": "test_origin",
+            "allergens": "test_allergens",
+            "vegan": True,
+            "vegetarian": True
+        })
 
     def test_save_ingredient_data(self):
         db = MagicMock(spec=Session)
         name = "test_ingredient"
-        data = {"name": "test_ingredient", "nutritional_info": "test_info"}
+        data = {
+            "nutritional_info": "test_info",
+            "description": "test_description",
+            "origin": "test_origin",
+            "allergens": "test_allergens",
+            "vegan": True,
+            "vegetarian": True
+        }
 
         save_ingredient_data(db, name, data)
 
