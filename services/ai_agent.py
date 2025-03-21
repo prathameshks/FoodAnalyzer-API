@@ -5,6 +5,7 @@ from models.ingredient import Ingredient
 from services.ingredients import get_ingredient_by_name, save_ingredient_data
 from typing import Dict, Any
 import json
+from transformers import pipeline
 
 def preprocess_data(barcode: str) -> Dict[str, Any]:
     data = fetch_product_data_from_api(barcode)
@@ -86,3 +87,8 @@ def process_data(db: Session, barcode: str) -> Dict[str, Any]:
     data = enrich_data(db, data)
     save_json_file(barcode, data)
     return data
+
+def integrate_hugging_face_transformers(model_name: str, text: str) -> str:
+    nlp = pipeline("fill-mask", model=model_name)
+    result = nlp(text)
+    return result[0]['sequence']
