@@ -2,7 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from database import Base, get_db
+from database import get_db
+from models.base import Base
 from main import app
 from services.auth_service import create_user, get_password_hash
 from models.user import User

@@ -1,15 +1,19 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
-from database import Base
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, String
+from typing import Optional, TYPE_CHECKING
+from .base import Base
+
+if TYPE_CHECKING:
+    from .user import User
 
 class UserPreferences(Base):
     __tablename__ = "user_preferences"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    dietary_restrictions = Column(String, nullable=True)
-    allergens = Column(String, nullable=True)
-    preferred_ingredients = Column(String, nullable=True)
-    disliked_ingredients = Column(String, nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    dietary_restrictions: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    allergens: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    preferred_ingredients: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    disliked_ingredients: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
-    user = relationship("User", back_populates="preferences")
+    user: Mapped["User"] = relationship("User", back_populates="preferences")
