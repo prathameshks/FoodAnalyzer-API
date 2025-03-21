@@ -34,23 +34,23 @@ def test_db():
     Base.metadata.drop_all(bind=engine)
 
 def test_register_user(test_db):
-    response = client.post("/auth/register", json={"username": "testuser", "email": "testuser@example.com", "password": "testpassword"})
+    response = client.post("/api/auth/register", json={"username": "testuser", "email": "testuser@example.com", "password": "testpassword"})
     assert response.status_code == 200
     assert "access_token" in response.json()
     assert response.json()["token_type"] == "bearer"
 
 def test_login_user(test_db):
     create_user(test_db, "testuser", "testuser@example.com", get_password_hash("testpassword"))
-    response = client.post("/auth/login", data={"username": "testuser", "password": "testpassword"})
+    response = client.post("/api/auth/login", data={"username": "testuser", "password": "testpassword"})
     assert response.status_code == 200
     assert "access_token" in response.json()
     assert response.json()["token_type"] == "bearer"
 
 def test_get_current_user(test_db):
     create_user(test_db, "testuser", "testuser@example.com", get_password_hash("testpassword"))
-    response = client.post("/auth/login", data={"username": "testuser", "password": "testpassword"})
+    response = client.post("/api/auth/login", data={"username": "testuser", "password": "testpassword"})
     token = response.json()["access_token"]
-    response = client.get("/auth/users/me", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/api/auth/users/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert response.json()["username"] == "testuser"
     assert response.json()["email"] == "testuser@example.com"
