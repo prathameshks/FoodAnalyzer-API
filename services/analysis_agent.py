@@ -3,13 +3,14 @@ from fastapi import HTTPException
 from typing import Dict, Any, List
 from models.user_preferences import UserPreferences
 from services.ingredients import get_ingredient_data, filter_ingredients_by_preferences
+from models.ingredient import Ingredient
 
 def analyze_ingredients(db: Session, ingredients: List[Dict[str, Any]], user_id: int) -> Dict[str, Any]:
     preferences = db.query(UserPreferences).filter(UserPreferences.user_id == user_id).first()
     if not preferences:
         raise HTTPException(status_code=404, detail="User preferences not found")
 
-    filtered_ingredients = filter_ingredients_by_preferences(ingredients, preferences)
+    filtered_ingredients = filter_ingredients_by_preferences(ingredients, preferences.__dict__)
     analysis_results = {
         "safe_ingredients": [],
         "unsafe_ingredients": [],

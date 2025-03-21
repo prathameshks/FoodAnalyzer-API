@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from utils import fetch_product_data_from_api, save_json_file
 from models.ingredient import Ingredient
-from services.ingredients import get_ingredient_by_name, save_ingredient_data
+from services.ingredients import get_ingredient_by_name, save_ingredient_data, fetch_ingredient_data_from_api
 from typing import Dict, Any
 import json
 from transformers import pipeline
@@ -73,7 +73,7 @@ def enrich_data(db: Session, data: Dict[str, Any]) -> Dict[str, Any]:
     for ingredient in data["ingredients"]:
         ingredient_data = get_ingredient_by_name(db, ingredient["text"])
         if not ingredient_data:
-            ingredient_data = fetch_product_data_from_api(ingredient["text"])
+            ingredient_data = fetch_ingredient_data_from_api(ingredient["text"])
             save_ingredient_data(db, ingredient["text"], ingredient_data)
         ingredient["nutritional_info"] = ingredient_data
     return data
