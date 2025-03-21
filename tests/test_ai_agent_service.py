@@ -118,7 +118,7 @@ class TestAIAgentService(unittest.TestCase):
         mock_fetch_product_data_from_api.return_value = {'nutritional_info': 'Test Info'}
         enriched_data = enrich_data(db, data)
         self.assertEqual(enriched_data['ingredients'][0]['nutritional_info'], {'nutritional_info': 'Test Info'})
-        mock_save_ingredient_data.assert_called_once_with(db, 'test ingredient', {'nutritional_info': 'Test Info'})
+        mock_save_ingredient_data.assert_called_once_with(db, 'Test Ingredient', {'nutritional_info': 'Test Info'})
 
     @patch('services.ai_agent.preprocess_data')
     @patch('services.ai_agent.validate_data')
