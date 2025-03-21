@@ -59,7 +59,7 @@
 - `GET /api/extract_product_info`: Extract product information from a barcode.
 - `POST /api/fetch_product_data`: Fetch product data for a list of barcodes.
 
-## Environment Variables
+## Environment Variables 
 
 ### Hugging Face Transformers API key
 Obtain a free API key from Hugging Face by signing up on their website. Add the API key to the `.env` file with the variable name `HUGGING_FACE_API_KEY`.
