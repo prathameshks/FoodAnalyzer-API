@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from routers.auth import router as auth_router
 from routers.analysis import router as analysis_router
 from routers.history import router as history_router
-from database import get_db,engine
+from database import get_db, engine
 from models.base import Base
 
 app = FastAPI()
