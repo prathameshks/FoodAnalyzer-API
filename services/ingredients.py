@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from cachetools import cached, TTLCache
 from typing import List, Dict, Any
 import requests
+from utils.fetch_data import fetch_ingredient_data_from_api
 
 cache = TTLCache(maxsize=100, ttl=300)
 
