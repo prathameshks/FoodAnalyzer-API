@@ -10,7 +10,7 @@ class ScanHistory(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     product_id: Mapped[int] = mapped_column(Integer)
-    scan_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    scan_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     # Add relationship to user
     user: Mapped["User"] = relationship("User", back_populates="scan_history")
