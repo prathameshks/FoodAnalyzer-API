@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from utils.fetch_data import fetch_product_data_from_api
-from utils.file_operations import save_json_file
+from utils import fetch_product_data_from_api, save_json_file
 from models.ingredient import Ingredient
 from models.product import Product
 from services.ingredients import get_ingredient_by_name, save_ingredient_data, fetch_ingredient_data_from_api
