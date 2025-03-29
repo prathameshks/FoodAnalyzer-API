@@ -16,3 +16,5 @@ pytest
 pytest-cov
 httpx
 bcrypt
+langchain
+python-dotenv
