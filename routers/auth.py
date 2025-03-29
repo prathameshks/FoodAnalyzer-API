@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from database import get_db
 from services.auth_service import authenticate_user, create_access_token, create_user, get_current_active_user
 from datetime import timedelta
+from models.user import User
 
 router = APIRouter()
 
@@ -42,5 +43,5 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/users/me", response_model=UserCreate)
-def read_users_me(current_user: UserCreate = Depends(get_current_active_user)):
+def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
