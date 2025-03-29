@@ -8,6 +8,7 @@ from services.ingredients import get_ingredient_by_name, save_ingredient_data, f
 from typing import Dict, Any
 import json
 from transformers import pipeline
+from langchain import LangChain
 
 def preprocess_data(barcode: str) -> Dict[str, Any]:
     data = fetch_product_data_from_api(barcode)
@@ -120,3 +121,48 @@ def integrate_hugging_face_transformers(model_name: str, text: str) -> str:
     nlp = pipeline("fill-mask", model=model_name)
     result = nlp(text)
     return result[0]['sequence']
+
+def process_ingredients(db: Session, ingredients: list[str], user_id: int) -> dict[str, Any]:
+    # First agent: Correct mistakes in the ingredient list using NLP, check the database for details, and search the web if not found
+    corrected_ingredients = []
+    for ingredient in ingredients:
+        corrected_ingredient = integrate_hugging_face_transformers("bert-base-uncased", ingredient)
+        ingredient_data = get_ingredient_by_name(db, corrected_ingredient)
+        if not ingredient_data:
+            ingredient_data = fetch_ingredient_data_from_api(corrected_ingredient)
+            save_ingredient_data(db, corrected_ingredient, ingredient_data)
+        corrected_ingredients.append({
+            "name": corrected_ingredient,
+            "pros_cons": ingredient_data
+        })
+
+    # Second agent: Analyze the ingredient list and return data including safety, score, eating limit, and key insights
+    analysis_results = []
+    for ingredient in corrected_ingredients:
+        safety_score = LangChain.analyze_safety(ingredient["name"])
+        score = LangChain.analyze_score(ingredient["name"])
+        eating_limit = LangChain.analyze_eating_limit(ingredient["name"])
+        key_insights = LangChain.analyze_key_insights(ingredient["name"])
+        analysis_results.append({
+            "ingredient": ingredient["name"],
+            "safety": safety_score,
+            "score": score,
+            "eating_limit": eating_limit,
+            "key_insights": key_insights
+        })
+
+    # Save the results in user search history and product
+    for result in analysis_results:
+        product = Product(
+            product_name=result["ingredient"],
+            ingredients=[result],
+            ingredients_analysis=result,
+        )
+        db.add(product)
+        db.commit()
+        db.refresh(product)
+
+    return {
+        "corrected_ingredients": corrected_ingredients,
+        "analysis_results": analysis_results
+    }
