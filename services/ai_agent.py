@@ -106,6 +106,14 @@ def enrich_data(db: Session, data: Dict[str, Any]) -> Dict[str, Any]:
                 ingredient_data = fetch_ingredient_data_from_api(ingredient["text"])
                 save_ingredient_data(db, ingredient["text"], ingredient_data)
             ingredient["nutritional_info"] = ingredient_data
+
+            # Additional API calls for ingredient safety analysis, nutritional information, score analysis, origin and source, and allergen information
+            ingredient["safety_info"] = fetch_ingredient_safety_info(ingredient["text"])
+            ingredient["nutritional_info"] = fetch_ingredient_nutritional_info(ingredient["text"])
+            ingredient["score_info"] = fetch_ingredient_score_info(ingredient["text"])
+            ingredient["origin_info"] = fetch_ingredient_origin_info(ingredient["text"])
+            ingredient["allergen_info"] = fetch_ingredient_allergen_info(ingredient["text"])
+
         log_info("enrich_data function completed successfully")
         return data
     except Exception as e:
@@ -147,6 +155,12 @@ def process_data(db: Session, barcode: str) -> Dict[str, Any]:
                 ingredient_data = fetch_ingredient_data_from_api(ingredient["text"])
                 save_ingredient_data(db, ingredient["text"], ingredient_data)
             ingredient["nutritional_info"] = ingredient_data
+
+            # LangChain method calls for ingredient analysis
+            ingredient["safety"] = LangChain.analyze_safety(ingredient["text"])
+            ingredient["score"] = LangChain.analyze_score(ingredient["text"])
+            ingredient["eating_limit"] = LangChain.analyze_eating_limit(ingredient["text"])
+            ingredient["key_insights"] = LangChain.analyze_key_insights(ingredient["text"])
         
         save_json_file(barcode, data)
         log_info("process_data function completed successfully")
