@@ -55,15 +55,3 @@ def save_ingredient_data(db: Session, name: str, data: Dict[str, Any]):
     db.add(ingredient)
     db.commit()
     db.refresh(ingredient)
-
-def filter_ingredients_by_preferences(ingredients: List[Dict[str, Any]], preferences: Dict[str, Any]) -> List[Dict[str, Any]]:
-    filtered_ingredients = []
-    for ingredient in ingredients:
-        if preferences.get("low_sugar") and ingredient.get("sugar", 0) > 5:
-            continue
-        if preferences.get("low_fat") and ingredient.get("fat", 0) > 5:
-            continue
-        if preferences.get("allergens") and any(allergen in ingredient.get("allergens", []) for allergen in preferences["allergens"]):
-            continue
-        filtered_ingredients.append(ingredient)
-    return filtered_ingredients
