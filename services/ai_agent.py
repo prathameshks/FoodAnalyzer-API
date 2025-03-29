@@ -8,7 +8,7 @@ from services.ingredients import get_ingredient_by_name, save_ingredient_data, f
 from typing import Dict, Any
 import json
 from transformers import pipeline
-from langchain import LangChain
+from langchain.llms import OpenAI
 from services.logging_service import log_info, log_error
 
 def preprocess_data(barcode: str) -> Dict[str, Any]:
@@ -157,10 +157,10 @@ def process_data(db: Session, barcode: str) -> Dict[str, Any]:
             ingredient["nutritional_info"] = ingredient_data
 
             # LangChain method calls for ingredient analysis
-            ingredient["safety"] = LangChain.analyze_safety(ingredient["text"])
-            ingredient["score"] = LangChain.analyze_score(ingredient["text"])
-            ingredient["eating_limit"] = LangChain.analyze_eating_limit(ingredient["text"])
-            ingredient["key_insights"] = LangChain.analyze_key_insights(ingredient["text"])
+            ingredient["safety"] = OpenAI().analyze_safety(ingredient["text"])
+            ingredient["score"] = OpenAI().analyze_score(ingredient["text"])
+            ingredient["eating_limit"] = OpenAI().analyze_eating_limit(ingredient["text"])
+            ingredient["key_insights"] = OpenAI().analyze_key_insights(ingredient["text"])
         
         save_json_file(barcode, data)
         log_info("process_data function completed successfully")
@@ -199,10 +199,10 @@ def process_ingredients(db: Session, ingredients: list[str], user_id: int) -> di
         # Second agent: Analyze the ingredient list and return data including safety, score, eating limit, and key insights
         analysis_results = []
         for ingredient in corrected_ingredients:
-            safety_score = LangChain.analyze_safety(ingredient["name"])
-            score = LangChain.analyze_score(ingredient["name"])
-            eating_limit = LangChain.analyze_eating_limit(ingredient["name"])
-            key_insights = LangChain.analyze_key_insights(ingredient["name"])
+            safety_score = OpenAI().analyze_safety(ingredient["name"])
+            score = OpenAI().analyze_score(ingredient["name"])
+            eating_limit = OpenAI().analyze_eating_limit(ingredient["name"])
+            key_insights = OpenAI().analyze_key_insights(ingredient["name"])
             analysis_results.append({
                 "ingredient": ingredient["name"],
                 "safety": safety_score,
