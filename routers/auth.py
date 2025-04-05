@@ -1,23 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
 from database import get_db
 from services.auth_service import authenticate_user, create_access_token, create_user, get_current_active_user
 from datetime import timedelta
 from models.user import User
 from services.logging_service import log_info, log_error
+from interfaces.authModels import UserCreate,UserResponse,Token
 
 router = APIRouter()
 
-class UserCreate(BaseModel):
-    username: str
-    email: str
-    password: str
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
 
 @router.post("/register", response_model=Token)
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -46,7 +38,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        access_token_expires = timedelta(minutes=30)
+        access_token_expires = timedelta(weeks=4)
         access_token = create_access_token(
             data={"sub": user.username}, expires_delta=access_token_expires
         )
@@ -56,7 +48,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         log_error(f"Error in login endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router.get("/users/me", response_model=UserCreate)
+@router.get("/users/me", response_model=UserResponse)
 def read_users_me(current_user: User = Depends(get_current_active_user)):
     log_info("Read users/me endpoint called")
     try:

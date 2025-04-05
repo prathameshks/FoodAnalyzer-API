@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session,Mapped
 from database import get_db
 from models.user import User
-from pydantic import BaseModel
+from interfaces.authModels import UserResponse,TokenData
 from services.logging_service import log_info, log_error
 
 # to get a string like this run:
@@ -18,12 +18,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    username: str | None = None
 
 
 def verify_password(plain_password, hashed_password):
@@ -107,7 +101,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     try:
         if not current_user.is_active:
             raise HTTPException(status_code=400, detail="Inactive user")
-        return current_user
+        return UserResponse.from_orm(current_user)
     except Exception as e:
         log_error(f"Error getting current active user: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
