@@ -164,10 +164,10 @@ def process_data(db: Session, barcode: str) -> Dict[str, Any]:
             ingredient["nutritional_info"] = ingredient_data
 
             # LangChain method calls for ingredient analysis
-            ingredient["safety"] = LangChain.analyze_safety(ingredient["text"])
-            ingredient["score"] = LangChain.analyze_score(ingredient["text"])
-            ingredient["eating_limit"] = LangChain.analyze_eating_limit(ingredient["text"])
-            ingredient["key_insights"] = LangChain.analyze_key_insights(ingredient["text"])
+            ingredient["safety"] = OpenAI().analyze_safety(ingredient["text"])
+            ingredient["score"] = OpenAI().analyze_score(ingredient["text"])
+            ingredient["eating_limit"] = OpenAI().analyze_eating_limit(ingredient["text"])
+            ingredient["key_insights"] = OpenAI().analyze_key_insights(ingredient["text"])
         
         save_json_file(barcode, data)
         log_info("process_data function completed successfully")

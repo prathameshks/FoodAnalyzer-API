@@ -5,7 +5,7 @@ from models.user_preferences import UserPreferences
 from services.ingredients import get_ingredient_data, filter_ingredients_by_preferences
 from models.ingredient import Ingredient
 from services.logging_service import log_info, log_error
-from langchain import LangChain
+from langchain.llms import OpenAI
 
 def provide_personalized_recommendations(db: Session, user_id: int) -> Dict[str, Any]:
     log_info("provide_personalized_recommendations function called")
@@ -35,10 +35,10 @@ def analyze_ingredients(ingredients: List[str]) -> List[Dict[str, Any]]:
     try:
         analysis_results = []
         for ingredient in ingredients:
-            safety_score = LangChain.analyze_safety(ingredient)
-            score = LangChain.analyze_score(ingredient)
-            eating_limit = LangChain.analyze_eating_limit(ingredient)
-            key_insights = LangChain.analyze_key_insights(ingredient)
+            safety_score = OpenAI().analyze_safety(ingredient)
+            score = OpenAI().analyze_score(ingredient)
+            eating_limit = OpenAI().analyze_eating_limit(ingredient)
+            key_insights = OpenAI().analyze_key_insights(ingredient)
             analysis_results.append({
                 "ingredient": ingredient,
                 "safety": safety_score,
