@@ -1,3 +1,4 @@
+import os
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from utils.fetch_data import fetch_product_data_from_api
@@ -8,8 +9,14 @@ from services.ingredients import get_ingredient_by_name, save_ingredient_data, f
 from typing import Dict, Any
 import json
 from transformers import pipeline
-from langchain import LangChain
+from langchain_community.llms import OpenAI
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
 from services.logging_service import log_info, log_error
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 def preprocess_data(barcode: str) -> Dict[str, Any]:
     log_info("preprocess_data function called")
@@ -108,11 +115,11 @@ def enrich_data(db: Session, data: Dict[str, Any]) -> Dict[str, Any]:
             ingredient["nutritional_info"] = ingredient_data
 
             # Additional API calls for ingredient safety analysis, nutritional information, score analysis, origin and source, and allergen information
-            ingredient["safety_info"] = fetch_ingredient_safety_info(ingredient["text"])
-            ingredient["nutritional_info"] = fetch_ingredient_nutritional_info(ingredient["text"])
-            ingredient["score_info"] = fetch_ingredient_score_info(ingredient["text"])
-            ingredient["origin_info"] = fetch_ingredient_origin_info(ingredient["text"])
-            ingredient["allergen_info"] = fetch_ingredient_allergen_info(ingredient["text"])
+            # ingredient["safety_info"] = fetch_ingredient_safety_info(ingredient["text"])
+            # ingredient["nutritional_info"] = fetch_ingredient_nutritional_info(ingredient["text"])
+            # ingredient["score_info"] = fetch_ingredient_score_info(ingredient["text"])
+            # ingredient["origin_info"] = fetch_ingredient_origin_info(ingredient["text"])
+            # ingredient["allergen_info"] = fetch_ingredient_allergen_info(ingredient["text"])
 
         log_info("enrich_data function completed successfully")
         return data
@@ -129,7 +136,7 @@ def process_data(db: Session, barcode: str) -> Dict[str, Any]:
             raise HTTPException(status_code=400, detail="Invalid data")
         data = clean_data(data)
         data = standardize_data(data)
-        data = enrich_data(db, data)
+        # data = enrich_data(db, data)
         
         # Save product details in the Product model
         product = Product(
@@ -183,50 +190,39 @@ def integrate_hugging_face_transformers(model_name: str, text: str) -> str:
 def process_ingredients(db: Session, ingredients: list[str], user_id: int) -> dict[str, Any]:
     log_info("process_ingredients function called")
     try:
-        # First agent: Correct mistakes in the ingredient list using NLP, check the database for details, and search the web if not found
-        corrected_ingredients = []
-        for ingredient in ingredients:
-            corrected_ingredient = integrate_hugging_face_transformers("bert-base-uncased", ingredient)
-            ingredient_data = get_ingredient_by_name(db, corrected_ingredient)
-            if not ingredient_data:
-                ingredient_data = fetch_ingredient_data_from_api(corrected_ingredient)
-                save_ingredient_data(db, corrected_ingredient, ingredient_data)
-            corrected_ingredients.append({
-                "name": corrected_ingredient,
-                "pros_cons": ingredient_data
-            })
-
-        # Second agent: Analyze the ingredient list and return data including safety, score, eating limit, and key insights
+        # Initialize LangChain components
+        llm = OpenAI(temperature=0.7,
+                     openai_api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # Create prompt templates for different analyses
+        safety_template = PromptTemplate(
+            input_variables=["ingredient"],
+            template="Analyze the safety of {ingredient} as a food ingredient."
+        )
+        
+        score_template = PromptTemplate(
+            input_variables=["ingredient"],
+            template="Rate {ingredient} on a scale of 1-10 for nutritional value."
+        )
+        
+        # Create chains
+        safety_chain = LLMChain(llm=llm, prompt=safety_template)
+        score_chain = LLMChain(llm=llm, prompt=score_template)
+        
         analysis_results = []
-        for ingredient in corrected_ingredients:
-            safety_score = LangChain.analyze_safety(ingredient["name"])
-            score = LangChain.analyze_score(ingredient["name"])
-            eating_limit = LangChain.analyze_eating_limit(ingredient["name"])
-            key_insights = LangChain.analyze_key_insights(ingredient["name"])
+        for ingredient in ingredients:
+            safety = safety_chain.run(ingredient=ingredient)
+            score = score_chain.run(ingredient=ingredient)
+            
             analysis_results.append({
-                "ingredient": ingredient["name"],
-                "safety": safety_score,
-                "score": score,
-                "eating_limit": eating_limit,
-                "key_insights": key_insights
+                "ingredient": ingredient,
+                "safety_analysis": safety,
+                "nutritional_score": score
             })
-
-        # Save the results in user search history and product
-        for result in analysis_results:
-            product = Product(
-                product_name=result["ingredient"],
-                ingredients=[result],
-                ingredients_analysis=result,
-            )
-            db.add(product)
-            db.commit()
-            db.refresh(product)
-
-        log_info("process_ingredients function completed successfully")
-        return {
-            "corrected_ingredients": corrected_ingredients,
-            "analysis_results": analysis_results
-        }
+        
+        log_info("process_ingredients completed successfully")
+        return {"results": analysis_results}
+        
     except Exception as e:
-        log_error(f"Error in process_ingredients function: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        log_error(f"Error in process_ingredients: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error processing ingredients")

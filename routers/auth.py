@@ -48,7 +48,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         log_error(f"Error in login endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router.get("/users/me", response_model=UserResponse)
+@router.get("/user", response_model=UserResponse)
 def read_users_me(current_user: User = Depends(get_current_active_user)):
     log_info("Read users/me endpoint called")
     try:

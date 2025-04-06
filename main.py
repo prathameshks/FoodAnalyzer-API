@@ -18,8 +18,8 @@ async def create_tables():
         log_error(f"Error creating database tables: {str(e)}")
         raise HTTPException(status_code=500, detail="Error creating database tables")
 
-app.include_router(auth_router, prefix="/api")
-app.include_router(analysis_router, prefix="/api")
-app.include_router(history_router, prefix="/api")
+app.include_router(analysis_router, prefix="/api/analyze")
+app.include_router(auth_router, prefix="/api/auth")
+app.include_router(history_router, prefix="/api/history")
 
 # To run the FastAPI app, use the command: uvicorn main:app --reload

@@ -36,6 +36,7 @@ def process_product_endpoint(barcode: str, db: Session = Depends(get_db), curren
 @router.post("/process_ingredients")
 def process_ingredients_endpoint(ingredients: List[str], db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     log_info("process_ingredients_endpoint called")
+    print(ingredients)
     try:
         result = process_ingredients(db, ingredients, current_user.id)
         log_info("process_ingredients_endpoint completed successfully")

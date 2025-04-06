@@ -29,7 +29,7 @@ def create_scan(scan: ScanHistoryCreate, db: Session = Depends(get_db)):
         log_error(f"Error in create_scan endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router.get("/history/{user_id}", response_model=list[ScanHistoryResponse])
+@router.get("/scan/{user_id}", response_model=list[ScanHistoryResponse])
 def read_scan_history(user_id: int, db: Session = Depends(get_db)):
     log_info("Read scan history endpoint called")
     try:
