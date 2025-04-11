@@ -1,10 +1,10 @@
 from sqlalchemy.orm import Session
-from models.ingredient import Ingredient
+from db.models import Ingredient
 from fastapi import HTTPException
 from cachetools import cached, TTLCache
 from typing import List, Dict, Any
 import requests
-from utils.fetch_data import fetch_ingredient_data_from_api
+from utils.fetch_data import fetch_product_data_from_api
 
 cache = TTLCache(maxsize=100, ttl=300)
 
@@ -55,15 +55,3 @@ def save_ingredient_data(db: Session, name: str, data: Dict[str, Any]):
     db.add(ingredient)
     db.commit()
     db.refresh(ingredient)
-
-def filter_ingredients_by_preferences(ingredients: List[Dict[str, Any]], preferences: Dict[str, Any]) -> List[Dict[str, Any]]:
-    filtered_ingredients = []
-    for ingredient in ingredients:
-        if preferences.get("low_sugar") and ingredient.get("sugar", 0) > 5:
-            continue
-        if preferences.get("low_fat") and ingredient.get("fat", 0) > 5:
-            continue
-        if preferences.get("allergens") and any(allergen in ingredient.get("allergens", []) for allergen in preferences["allergens"]):
-            continue
-        filtered_ingredients.append(ingredient)
-    return filtered_ingredients
