@@ -43,28 +43,46 @@
 ## API Endpoints
 
 ### Authentication
-- `POST /api/register`: Register a new user.
-- `POST /api/login`: Login and obtain an access token.
-- `GET /api/users/me`: Get the current user's information.
+- `POST /api/auth/register`: Register a new user.
+- `POST /api/auth/login`: Login and obtain an access token.
+- `GET /api/auth/user`: Get the current user's information.
 
 ### Ingredient Analysis
-- `POST /api/analyze_ingredients`: Analyze a list of ingredients.
-- `GET /api/personalized_recommendations`: Get personalized ingredient recommendations.
+- `POST /api/analyze/analyze_ingredients`: Analyze a list of ingredients.
+- `GET /api/analyze/personalized_recommendations`: Get personalized ingredient recommendations.
 
 ### Scan History
-- `POST /api/scan`: Record a new scan.
-- `GET /api/history/{user_id}`: Retrieve the scan history for a user.
+- `POST /api/history/scan`: Record a new scan.
+- `GET /api/history/scan/{user_id}`: Retrieve the scan history for a user.
 
-### Product Data
+<!-- ### Product Data
 - `GET /api/extract_product_info`: Extract product information from a barcode.
-- `POST /api/fetch_product_data`: Fetch product data for a list of barcodes.
+- `POST /api/fetch_product_data`: Fetch product data for a list of barcodes. -->
 
-## Environment Variables 
 
-### Hugging Face Transformers API key
-Obtain a free API key from Hugging Face by signing up on their website. Add the API key to the `.env` file with the variable name `HUGGING_FACE_API_KEY`.
+## Alembic migrations
 
-Example:
-```env
-HUGGING_FACE_API_KEY=your_api_key_here  # Get your API key from https://huggingface.co
+### To create a new migration, run the following command:
+```bash
+alembic init migrations
+```
+
+### To generate a new migration file, run:
+```bash
+alembic revision --autogenerate -m "Message"
+```
+
+### To apply the migration, run:
+```bash
+alembic upgrade head
+```
+
+### To downgrade the migration, run:
+```bash
+alembic downgrade -1
+```
+
+### To view the current migration version, run:
+```bash
+alembic current
 ```
