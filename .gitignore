@@ -1,4 +1,24 @@
-__pycache__
-venv
+# Ignore sensitive data
 .env
-.pytest_cache
+alembic.ini
+
+
+debug*
+
+# Ignore temporary files
+*.tmp
+*.log
+*.bak
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
+# Ignore virtual environment directories
+venv/
+env/
+
+# Ignore IDE/editor specific files
+.vscode/
+.idea/
+*.swp
