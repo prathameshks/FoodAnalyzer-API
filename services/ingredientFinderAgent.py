@@ -208,7 +208,7 @@ def search_web(ingredient: str) -> Dict[str, Any]:
     
     try:
         duckduckgo = DuckDuckGoSearchRun()
-        search_queries = [f"{ingredient} food ingredient safety", f"{ingredient} E-number food additive"]
+        search_queries = [f"{ingredient} food ingredient safety", f"{ingredient} E-number food additive",f"{ingredient}'s allergic information",f"is {ingredient} vegan,vegetarian or Non-vegetarian"]
         all_results = []
         for query in search_queries:
             result = duckduckgo.run(query)
@@ -318,7 +318,7 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
             google_api_key=api_key,
             model=model_name,
             temperature=0.3,  # Lower temperature for more factual responses
-            convert_system_message_to_human=True
+            # convert_system_message_to_human=True
         )
     except Exception as e:
         logger.error(f"Error initializing LLM: {e}")
@@ -399,6 +399,8 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
         2. List of potential health effects (both positive & negative, maximum 5 points)
         3. Brief description of what this ingredient is, how it's used, and its properties
         4. Alternative names for this ingredient
+        5. Allergic information of the ingredient like which type of allergies we can got, etc.
+        6. Diet Type of that ingredient like Vegan, Vegetarian, Non-Vegetarian
         
         Available data:
         {combined_data}
@@ -408,9 +410,11 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
         - "health_effects": (array of strings)
         - "description": (string)
         - "alternate_names": (array of strings)
+        - "allergic_info": (array of strings)
+        - "diet_type" : (string from vegan,vegetarian,non-vegetarian,unknown)
         
         Only include factual information supported by the provided data. If information is 
-        unavailable for any field, use appropriate default values.
+        unavailable for any field, use appropriate default values. But if information is "too obvious" you can fill appropriate information.
         """
         
         # Process with LLM
@@ -437,7 +441,9 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
                         "safety_rating": analysis.get("safety_rating", 5),
                         "description": analysis.get("description", "No description available."),
                         "health_effects": analysis.get("health_effects", []),
-                        "alternate_names": analysis.get("alternate_names", [])
+                        "alternate_names": analysis.get("alternate_names", []),
+                        "allergic_info": analysis.get("allergic_info", []),
+                        "diet_type": analysis.get("diet_type", "unknown"),
                     })
                     logger.info(f"Analysis complete - Safety Rating: {result['safety_rating']}")
                 else:
@@ -551,38 +557,38 @@ class IngredientInfoAgentLangGraph:
         
         # Run each tool directly in sequence and collect results
         logger.info(f"Searching local database for {ingredient}")
-        result = search_local_db(ingredient)
+        result = search_local_db.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
             logger.info(f"Local DB found data for {ingredient}")
         
         logger.info(f"Searching web for {ingredient}")
-        result = search_web(ingredient)
+        result = search_web.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
             logger.info(f"Web search found data for {ingredient}")
         
         logger.info(f"Searching Wikipedia for {ingredient}")
-        result = search_wikipedia(ingredient)
+        result = search_wikipedia.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
             logger.info(f"Wikipedia found data for {ingredient}")
         
         logger.info(f"Searching Open Food Facts for {ingredient}")
-        result = search_open_food_facts(ingredient)
+        result = search_open_food_facts.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
             logger.info(f"Open Food Facts found data for {ingredient}")
         
         # Optional - Add these if needed:
         logger.info(f"Searching USDA for {ingredient}")
-        result = search_usda(ingredient)
+        result = search_usda.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
             logger.info(f"USDA found data for {ingredient}")
         
         logger.info(f"Searching PubChem for {ingredient}")
-        result = search_pubchem(ingredient)
+        result = search_pubchem.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
             logger.info(f"PubChem found data for {ingredient}")

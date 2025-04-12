@@ -10,7 +10,9 @@ class IngredientAnalysisResult(BaseModel):
     safety_rating: int = 5
     description: str = "No information found."
     health_effects: List[str] = Field(default_factory=lambda: ["Unknown"])
-    details_with_source: List[Dict[str, Any]] = [Field(default_factory=list)]
+    allergic_info: Optional[List[str]] = None  # New field
+    diet_type: Optional[str] = None  # New field
+    details_with_source: List[Dict[str, Any]] = Field(default_factory=list)
     
     class Config:
         from_attributes = True  # Enable ORM mode
