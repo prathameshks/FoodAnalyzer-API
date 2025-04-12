@@ -15,6 +15,8 @@ class Ingredient(Base):
     safety_rating = Column(Integer, nullable=True)
     description = Column(Text, nullable=True)
     health_effects = Column(JSON, nullable=True)
+    allergic_info = Column(JSON, nullable=True)
+    diet_type = Column(String, nullable=True)  
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

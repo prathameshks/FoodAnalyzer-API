@@ -37,7 +37,9 @@ class IngredientRepository:
             alternate_names=ingredient_data.alternate_names,
             safety_rating=ingredient_data.safety_rating,
             description=ingredient_data.description,
-            health_effects=ingredient_data.health_effects
+            health_effects=ingredient_data.health_effects,
+            allergic_info=ingredient_data.allergic_info,
+            diet_type=ingredient_data.diet_type
         )
         self.db.add(db_ingredient)
         self.db.commit()
