@@ -36,7 +36,7 @@ def search_local_db(ingredient: str) -> Dict[str, Any]:
     """Search local database for ingredient information. E number database scrapped"""
     logger.info(f"Searching local DB for: {ingredient}")
     if additives_df is not None:
-        match = additives_df[additives_df['Name of Aditive'].str.contains(ingredient, case=False, na=False)]
+        match = additives_df[additives_df['Name of Additive'].str.contains(ingredient, case=False, na=False, regex=False)]
         if not match.empty:
             return {"source": "Local DB", "found": True, "data": match.iloc[0].to_dict()}
     return {"source": "Local DB", "found": False, "data": None}
