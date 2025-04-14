@@ -1,9 +1,13 @@
+import asyncio
+from functools import partial
 import os
 import json
 import traceback
 import requests
 import pandas as pd
 from dotenv import load_dotenv
+import aiohttp
+import time
 
 from typing import Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -28,6 +32,14 @@ else:
     additives_df = None
     logger.warning("Scraped database not found!")
 
+
+# Define a rate limit (adjust as needed)
+PUBCHEM_TIMEOUT = float(os.getenv("PUBCHEM_TIMEOUT", "2.0"))   # seconds
+PUBCHEM_MAX_RETRIES = int(os.getenv("PUBCHEM_MAX_RETRIES", "3"))  # Max retries
+
+# Rate limiting configuration
+DUCKDUCKGO_RATE_LIMIT_DELAY = float(os.getenv("DUCKDUCKGO_RATE_LIMIT_DELAY", "2.0"))  # Delay in seconds
+DUCKDUCKGO_MAX_RETRIES = int(os.getenv("DUCKDUCKGO_MAX_RETRIES", "3"))  # Max retries
 
 
 # Define tool functions
@@ -115,37 +127,51 @@ def search_usda(ingredient: str) -> Dict[str, Any]:
         logger.error(f"Error searching USDA: {e}")
         return {"source": "USDA FoodData Central", "found": False, "error": str(e)}
 
-@tool("search_pubchem")
-def search_pubchem(ingredient: str) -> Dict[str, Any]:
-    """Search PubChem for chemical information about the ingredient."""
+async def async_search_pubchem(ingredient: str) -> Dict[str, Any]:
+    """Asynchronously search PubChem for chemical information about the ingredient."""
     logger.info(f"Searching PubChem for: {ingredient}")
     
     try:
         pubchem_api = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
         
-        # First try to get compound information by name
-        search_url = f"{pubchem_api}/compound/name/{ingredient}/JSON"
-        response = requests.get(search_url, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "PC_Compounds" in data:
+        async with aiohttp.ClientSession() as session:
+            # First try to get compound information by name
+            search_url = f"{pubchem_api}/compound/name/{ingredient}/JSON"
+            
+            async def fetch_data(url: str, timeout: int = PUBCHEM_TIMEOUT, retry_count: int = 0):
+                try:
+                    async with session.get(url, timeout=timeout) as response:
+                        if response.status == 200:
+                            return await response.json()
+                        else:
+                            logger.warning(f"PubChem returned status: {response.status} for URL: {url}")
+                            return None
+                except asyncio.TimeoutError:
+                    if retry_count < PUBCHEM_MAX_RETRIES:
+                        delay = (2 ** retry_count) * 5  # Exponential backoff
+                        logger.warning(f"PubChem timeout for URL '{url}'. Retrying in {delay:.2f} seconds (attempt {retry_count + 1}/{PUBCHEM_MAX_RETRIES})")
+                        await asyncio.sleep(delay)
+                        return await fetch_data(url, timeout, retry_count + 1)  # Recursive retry
+                    else:
+                        logger.error(f"Max retries reached for PubChem timeout on URL: {url}")
+                        return None
+                except Exception as e:
+                    logger.error(f"PubChem error for URL '{url}': {e}")
+                    return None
+            
+            data = await fetch_data(search_url)
+            
+            if data and "PC_Compounds" in data:
                 compound_id = data["PC_Compounds"][0]["id"]["id"]["cid"]
                 
                 # Get more detailed information using the CID
                 property_url = f"{pubchem_api}/compound/cid/{compound_id}/property/MolecularFormula,MolecularWeight,IUPACName,InChI,InChIKey,CanonicalSMILES/JSON"
-                prop_response = requests.get(property_url, timeout=10)
-                properties_data = None
-                if prop_response.status_code == 200:
-                    properties_data = prop_response.json()
-                    
+                properties_data = await fetch_data(property_url)
+                
                 # Get classifications and categories
                 classification_url = f"{pubchem_api}/compound/cid/{compound_id}/classification/JSON"
-                class_response = requests.get(classification_url, timeout=10)
-                classification_data = None
-                if class_response.status_code == 200:
-                    classification_data = class_response.json()
-                    
+                classification_data = await fetch_data(classification_url)
+                
                 return {
                     "source": "PubChem",
                     "found": True,
@@ -155,13 +181,25 @@ def search_pubchem(ingredient: str) -> Dict[str, Any]:
                         "classification": classification_data
                     }
                 }
-        
-        return {"source": "PubChem", "found": False, "data": None}
+            
+            return {"source": "PubChem", "found": False, "data": None}
     
     except Exception as e:
         logger.error(f"Error searching PubChem: {e}")
         return {"source": "PubChem", "found": False, "error": str(e)}
 
+@tool("search_pubchem")
+def search_pubchem(ingredient: str) -> Dict[str, Any]:
+    """Search PubChem for chemical information about the ingredient."""
+    # Use asyncio.run to handle the async operation from synchronous code
+    try:
+        # For Python 3.7+
+        return asyncio.run(async_search_pubchem(ingredient))
+    except RuntimeError:
+        # If already in an event loop (e.g., in FastAPI)
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(async_search_pubchem(ingredient))
+    
 @tool("search_wikipedia")
 def search_wikipedia(ingredient: str) -> Dict[str, Any]:
     """Search Wikipedia for ingredient information."""
@@ -211,6 +249,7 @@ def search_web(ingredient: str) -> Dict[str, Any]:
         search_queries = [f"{ingredient} food ingredient safety", f"{ingredient} E-number food additive",f"{ingredient}'s allergic information",f"is {ingredient} vegan,vegetarian or Non-vegetarian"]
         all_results = []
         for query in search_queries:
+            time.sleep(DUCKDUCKGO_RATE_LIMIT_DELAY)
             result = duckduckgo.run(query)
             if result:
                 all_results.append({"query": query, "result": result})
@@ -386,7 +425,7 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
         
         # Combine all source texts
         combined_data = "\n\n".join(source_texts)
-        logger.debug(f"Combined data for analysis:\n{combined_data[:500]}...(truncated)")
+        logger.info(f"Combined data for analysis:\n{combined_data[:500]}...(truncated)")
         
         # Create the analysis prompt
         analysis_prompt = f"""
@@ -414,7 +453,7 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
         - "diet_type" : (string from vegan,vegetarian,non-vegetarian,unknown)
         
         Only include factual information supported by the provided data. If information is 
-        unavailable for any field, use appropriate default values. But if information is "too obvious" you can fill appropriate information.
+        unavailable for any field, use appropriate default values. But if information is too obvious you can fill appropriate information just make sure only relevant data is there in the output.
         """
         
         # Process with LLM
@@ -547,10 +586,93 @@ def format_list_source(source_name: str, source_data: list) -> str:
     return source_text
 
 class IngredientInfoAgentLangGraph:
-    # Add this method to your IngredientInfoAgentLangGraph class
+    async def _fetch_data_from_source(self, tool_func, ingredient: str) -> Dict[str, Any]:
+        """Fetch data from a single source asynchronously."""
+        # Get tool name safely - handle both function tools and structured tools
+        if hasattr(tool_func, "name"):
+            # For structured tools
+            tool_name = tool_func.name
+        elif hasattr(tool_func, "__name__"):
+            # For function tools
+            tool_name = tool_func.__name__
+        else:
+            # Fallback
+            tool_name = str(tool_func).split()[0]
+        
+        source_name = tool_name.replace("search_", "").replace("_", " ").title()
+        logger.info(f"Searching {source_name} for {ingredient}")
+        
+        try:
+            # Run the tool function in a thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, partial(tool_func.invoke, ingredient))
+            
+            if result.get("found", False):
+                logger.info(f"{source_name} found data for {ingredient}")
+            return result
+        except Exception as e:
+            logger.error(f"Error in {source_name} search: {e}")
+            return {"source": source_name, "found": False, "error": str(e)}
+    
+    async def process_ingredient_async(self, ingredient: str) -> IngredientAnalysisResult:
+        """Process an ingredient using parallel data fetching."""
+        logger.info(f"=== Parallel processing for: {ingredient} ===")
+        
+        # Define all the tools to run in parallel
+        tools = [
+            search_local_db,
+            search_web,
+            search_wikipedia,
+            search_open_food_facts,
+            search_usda,
+            search_pubchem
+        ]
+        
+        # Create tasks for each tool
+        tasks = [self._fetch_data_from_source(tool, ingredient) for tool in tools]
+        
+        # Run all tasks concurrently and collect results
+        results = await asyncio.gather(*tasks)
+        
+        # Filter for successful results
+        sources_data = [result for result in results if not result.get("error")]
+        
+        # Create a state for analysis
+        state = {
+            "ingredient": ingredient,
+            "sources_data": sources_data,
+            "result": None,
+            "status": "ready_for_analysis",
+            "analysis_done": False,
+            "local_db_checked": True,
+            "web_search_done": True,
+            "wikipedia_checked": True,
+            "open_food_facts_checked": True,
+            "usda_checked": True,
+            "pubchem_checked": True
+        }
+        
+        # Run the analysis with the collected data
+        final_state = analyze_ingredient(state)
+        
+        # Extract the result or create a default
+        if final_state.get("result"):
+            logger.info(f"Analysis complete for {ingredient}")
+            return IngredientAnalysisResult(**final_state["result"])
+        else:
+            logger.info(f"No result in final state for {ingredient}, returning default")
+            return IngredientAnalysisResult(
+                name=ingredient, 
+                is_found=len(sources_data) > 0, 
+                details_with_source=sources_data
+            )
+        
     def process_ingredient(self, ingredient: str) -> IngredientAnalysisResult:
-        """Process an ingredient using direct sequential approach instead of LangGraph."""
-        logger.info(f"=== Direct sequential processing for: {ingredient} ===")
+        """
+        Process an ingredient using direct sequential approach instead of async.
+        This method provides compatibility with synchronous code.
+        """
+        logger.info(f"=== Sequential processing for: {ingredient} ===")
         
         # Initialize empty sources data
         sources_data = []
@@ -580,7 +702,7 @@ class IngredientInfoAgentLangGraph:
             sources_data.append(result)
             logger.info(f"Open Food Facts found data for {ingredient}")
         
-        # Optional - Add these if needed:
+        
         logger.info(f"Searching USDA for {ingredient}")
         result = search_usda.invoke(ingredient)
         if result.get("found", False):
@@ -622,7 +744,7 @@ class IngredientInfoAgentLangGraph:
                 is_found=len(sources_data) > 0, 
                 details_with_source=sources_data
             )
-
+        
 if __name__ == "__main__":
     agent = IngredientInfoAgentLangGraph()
     

@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+import pytz
 from sqlalchemy.orm import Session
 from db.models import ScanHistory
 from datetime import datetime
@@ -10,7 +11,7 @@ def record_scan(db: Session, user_id: int, product_id: int) -> ScanHistory:
         scan_entry = ScanHistory(
             user_id=user_id,
             product_id=product_id,
-            scan_date=datetime.utcnow()
+            scan_date=datetime.now(tz=pytz.timezone('Asia/Kolkata')),
         )
         db.add(scan_entry)
         db.commit()
