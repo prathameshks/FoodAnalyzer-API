@@ -64,21 +64,22 @@ analysis that would be helpful for a consumer viewing this in an AR application.
 ## INGREDIENTS INFORMATION:
 {''.join(ingredients_summary)}
 
+## Also consider the following user preferences:
 {user_context}
 
 ## REQUIRED ANALYSIS:
 1. Overall Safety Score (1-10): Calculate this based on individual ingredient safety scores
-2. Suitable Diet Types: Determine if this product is suitable for vegans, vegetarians, etc.
-3. Allergy Warnings: Flag any potential allergens present
+2. Suitable Diet Types: Determine if this product is for vegan, vegetarian, or Non-Vegetarian
+3. Allergy Warnings: Flag any potential allergens present related to food not more than 5 combine if needed
 4. Usage Recommendations: Provide safe consumption limits or usage guidance
-5. Health Insights: Summarize health benefits and concerns
+5. Health Insights: Summarize health benefits and concerns of the product not more than 3 for each and also focus on health not other aspects, may combine if needed but keep short
 6. Ingredient Interactions: Note any ingredients that may interact when combined
 7. Key Takeaway: A single sentence summarizing if this product is recommended
 
 ## FORMAT YOUR RESPONSE AS JSON:
 {{
   "overall_safety_score": (number between 1-10),
-  "suitable_diet_types": (array of strings like "Vegan", "Vegetarian", etc.),
+  "suitable_diet_types": (strings from "Vegan", "Vegetarian", "Non-Vegetarian"),
   "allergy_warnings": (array of strings),
   "usage_recommendations": (string with specific guidance),
   "health_insights": {{
@@ -89,7 +90,7 @@ analysis that would be helpful for a consumer viewing this in an AR application.
   "key_takeaway": (string)
 }}
 
-Only include factual information based on the provided data. If information is unavailable for any field, use appropriate default values.
+Only include factual information based on the provided data. If information is unavailable for any field, use appropriate default values. If the data required is too obvious then give appropriate answer.
 """
     
     logger.info("Sending product analysis prompt to LLM")
