@@ -132,7 +132,8 @@ async def async_search_pubchem(ingredient: str) -> Dict[str, Any]:
     logger.info(f"Searching PubChem for: {ingredient}")
     
     try:
-        pubchem_api = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
+        pubchem_api = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data"
+        # https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest#section=Input
         
         async with aiohttp.ClientSession() as session:
             # First try to get compound information by name
