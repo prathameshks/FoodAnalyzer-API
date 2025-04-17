@@ -3,6 +3,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import func
 from sqlalchemy.orm import Session,Mapped
 from db.database import get_db
 from db.models import User
@@ -39,13 +40,13 @@ def get_password_hash(password):
 def get_user(db, email: str):
     log_info(f"Getting user: {email}")
     try:
-        return db.query(User).filter(User.email == email).first()
+        return db.query(User).filter(func.lower(User.email) == email.lower()).first()
     except Exception as e:
         log_error(f"Error getting user: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 def authenticate_user(db: Session, username: str, password: str):
-    user = db.query(User).filter(User.email == username).first()
+    user = db.query(User).filter(func.lower(User.email) == username.lower()).first()
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -100,7 +101,7 @@ def create_user(db: Session, name: str, email: str, password: str):
     log_info(f"Creating user: {name}")
     try:
         hashed_password = get_password_hash(password)
-        db_user = User(name=name, email=email, hashed_password=hashed_password)
+        db_user = User(name=name, email=email.lower(), hashed_password=hashed_password)
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
