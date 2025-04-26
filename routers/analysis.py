@@ -35,7 +35,7 @@ log_info(f"Using parallel rate limit of {PARALLEL_RATE_LIMIT}")
 llm_semaphore = asyncio.Semaphore(PARALLEL_RATE_LIMIT)
 
 # Load YOLO model
-yolo_model = YOLO("yolov8n-seg.pt")  # Downloaded automatically if needed
+yolo_model = YOLO("yolov8n.pt")  # Downloaded automatically if needed
 UPLOADED_IMAGES_DIR = "uploaded_images"
 if not os.path.exists(UPLOADED_IMAGES_DIR):
     os.makedirs(UPLOADED_IMAGES_DIR)
@@ -62,12 +62,8 @@ def extract_product_from_image_yolo(image_path: str) -> str | None:
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # Preprocessing: Resize image
-        target_size = (640, 640)
-        image_resized = cv2.resize(image, target_size, interpolation=cv2.INTER_CUBIC)
-        original_height, original_width = image.shape[:2]
         # Run inference with YOLO
-        results = yolo_model(image_resized,conf=0.2,show=True)
+        results = yolo_model(image, conf=0.2)  # lower confidence for detection
 
         if not results:
             print("No objects detected by YOLO.")
@@ -75,43 +71,22 @@ def extract_product_from_image_yolo(image_path: str) -> str | None:
 
         # Process results
         result = results[0]
-        masks = result.masks
+        boxes = result.boxes
 
-        if masks is None or len(masks.data) == 0:
-            print("No segmentation masks found by YOLO.")
+        if len(boxes) == 0:
+            print("No objects detected by YOLO.")
             return None
-        
-        # Select the largest mask
-        mask_areas = [cv2.contourArea(masks.xy[i]) for i in range(len(masks))]
-        largest_mask_index = np.argmax(mask_areas)
-        largest_mask_tensor = masks.data[largest_mask_index].cpu()
-        largest_mask = largest_mask_tensor.numpy().astype(np.uint8)
 
-        # Resize the mask to the original image size
-        largest_mask = cv2.resize(largest_mask, (original_width, original_height))
-        
-        # Postprocessing: Basic mask cleanup (dilation/erosion)
-        kernel = np.ones((3, 3), np.uint8)
-        mask_cleaned = cv2.dilate(largest_mask, kernel, iterations=1)
-        mask_cleaned = cv2.erode(mask_cleaned, kernel, iterations=1)
-
-        # Create a masked image
-        masked_image = np.zeros_like(image)
-        masked_image[mask_cleaned.astype(bool)] = image[mask_cleaned.astype(bool)]
+        # Get the box with the highest confidence
+        box = boxes[0].xyxy[0].cpu().numpy().astype(int)
+        x_min, y_min, x_max, y_max = box
 
         # Crop the image
-        y_coords, x_coords = np.where(mask_cleaned)
-        x_min, x_max = np.min(x_coords), np.max(x_coords)
-        y_min, y_max = np.min(y_coords), np.max(y_coords)
-        cropped_image = masked_image[y_min:y_max, x_min:x_max]
-
-        # sharpen the image
-        sharpen_kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
-        cropped_image_sharpened = cv2.filter2D(cropped_image, -1, sharpen_kernel)
+        cropped_image = image[y_min:y_max, x_min:x_max]
 
         # Save the cropped image
         cropped_image_path = os.path.join(UPLOADED_IMAGES_DIR, f"{uuid.uuid4()}.jpg")
-        cropped_image_bgr = cv2.cvtColor(cropped_image_sharpened, cv2.COLOR_RGB2BGR)
+        cropped_image_bgr = cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
         cv2.imwrite(cropped_image_path, cropped_image_bgr)
         
         return cropped_image_path
@@ -167,7 +142,7 @@ async def get_image(image_name: str):
         return FileResponse(image_path, media_type="image/jpeg")
     else:
         return JSONResponse({"error": "Image not found"}, status_code=404)
-    
+
 # process single ingredient 
 @router.post("/process_ingredient", response_model=IngredientAnalysisResult)
 @traceable
