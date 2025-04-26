@@ -15,10 +15,19 @@ from db.database import get_db,SessionLocal
 from db.repositories import IngredientRepository
 from dotenv import load_dotenv
 from langsmith import traceable
+
 from PIL import Image
 import io
 import base64
 from fastapi.encoders import jsonable_encoder
+import uuid
+from typing import List
+from fastapi import APIRouter, File, Request, UploadFile
+from fastapi.responses import JSONResponse
+import cv2
+import numpy as np
+from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+
 
 from services.ingredientFinderAgent import IngredientInfoAgentLangGraph
 from services.productAnalyzerAgent import analyze_product_ingredients
@@ -32,6 +41,25 @@ log_info(f"Using parallel rate limit of {PARALLEL_RATE_LIMIT}")
 
 # Create a semaphore to limit concurrent API calls
 llm_semaphore = asyncio.Semaphore(PARALLEL_RATE_LIMIT)
+
+
+# SAM model path
+SAM_CHECKPOINT = "models/mobile_sam.pt"  # Replace with your SAM checkpoint file
+
+# SAM model setup
+sam_checkpoint = SAM_CHECKPOINT
+model_type = "vit_t"
+
+# Load SAM model
+sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
+
+# Initialize the mask generator
+mask_generator = SamAutomaticMaskGenerator(sam)
+
+UPLOADED_IMAGES_DIR = "uploaded_images"
+if not os.path.exists(UPLOADED_IMAGES_DIR):
+    os.makedirs(UPLOADED_IMAGES_DIR)
+
 
 router = APIRouter()
 
@@ -47,25 +75,98 @@ def ingredient_db_to_pydantic(db_ingredient):
         details_with_source=[source.data for source in db_ingredient.sources]
     )
 
-@router.post("/process_image")
-async def process_image(file: UploadFile = File(...)):
+def extract_product_from_image(image_path: str) -> str | None:
+    """
+    Extracts the product image from an image using SAM.
+
+    Args:
+        image_path: Path to the input image.
+
+    Returns:
+        Path to the extracted product image, or None if extraction failed.
+    """
     try:
-        contents = await file.read()
-        image = Image.open(io.BytesIO(contents))
+        # Load the image
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # Convert the image to JPEG format in memory
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format="JPEG")
-        img_byte_arr = img_byte_arr.getvalue()
-        # TODO add ML model to process the image and get the crop coordinates
-        # For testing frontend keeping same image and returning it
+        # Generate masks
+        masks = mask_generator.generate(image)
 
-        # Encode the JPEG image to base64
-        encoded_string = base64.b64encode(img_byte_arr).decode("utf-8")
+        if not masks:
+            print("No masks generated.")
+            return None
 
-        return JSONResponse({"cropped_image": encoded_string})
+        # Find the largest mask
+        largest_mask = max(masks, key=lambda mask: mask['area'])
+        mask = largest_mask["segmentation"]
+
+        # Create a masked image
+        masked_image = np.zeros_like(image)
+        masked_image[mask] = image[mask]
+
+        # Crop the image
+        y_coords, x_coords = np.where(mask)
+        x_min, x_max = np.min(x_coords), np.max(x_coords)
+        y_min, y_max = np.min(y_coords), np.max(y_coords)
+        cropped_image = masked_image[y_min:y_max, x_min:x_max]
+
+        # Save the cropped image
+        cropped_image_path = os.path.join(
+            UPLOADED_IMAGES_DIR, f"{uuid.uuid4()}.jpg"
+        )
+        cropped_image_bgr = cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(cropped_image_path, cropped_image_bgr)
+
+        return cropped_image_path
+    except Exception as e:
+        print(f"Error during image processing: {e}")
+        return None
+
+@router.post("/process_image")
+async def process_image(image: UploadFile = File(...)):
+    """
+    Endpoint to process an image and extract the product using SAM.
+
+    Args:
+        image: The uploaded image file.
+
+    Returns:
+        JSON response with the path to the processed image or an error message.
+    """
+    try:
+        # Save the uploaded image temporarily
+        temp_image_filename = f"{uuid.uuid4()}.jpg"
+        temp_image_path = os.path.join(UPLOADED_IMAGES_DIR, temp_image_filename)
+        contents = await image.read()
+        img = Image.open(io.BytesIO(contents))
+        img.save(temp_image_path, "JPEG")
+
+        print("Image saved temporarily to:", temp_image_path)
+
+        # Extract the product
+        extracted_product_path = extract_product_from_image(temp_image_path)
+
+        # Remove the temporary file
+        os.remove(temp_image_path)
+        print("Removed temporary file")
+
+        if extracted_product_path:
+            print("Product extracted and saved to:", extracted_product_path)
+            return JSONResponse(
+                {
+                    "message": "Product extracted successfully",
+                    "product_image_path": extracted_product_path,
+                }
+            )
+        else:
+            print("Failed to extract the product.")
+            return JSONResponse(
+                {"error": "Failed to extract product from image"}, status_code=500
+            )
 
     except Exception as e:
+        print("Error:", e)
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # process single ingredient 
