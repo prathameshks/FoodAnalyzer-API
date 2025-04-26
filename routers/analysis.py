@@ -85,11 +85,12 @@ def extract_product_from_image_yolo(image_path: str) -> str | None:
         cropped_image = image[y_min:y_max, x_min:x_max]
 
         # Save the cropped image
-        cropped_image_path = os.path.join(UPLOADED_IMAGES_DIR, f"{uuid.uuid4()}.jpg")
+        cropped_image_name = f"{uuid.uuid4()}.jpg"
+        cropped_image_path = os.path.join(UPLOADED_IMAGES_DIR, cropped_image_name)
         cropped_image_bgr = cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
         cv2.imwrite(cropped_image_path, cropped_image_bgr)
         
-        return cropped_image_path
+        return cropped_image_name
 
     except Exception as e:
         print(f"Error during YOLO image processing: {e}")
@@ -110,19 +111,19 @@ async def process_image(image: UploadFile = File(...)):
         print("Image saved temporarily to:", temp_image_path)
 
         # Extract the product using YOLO
-        extracted_product_path = extract_product_from_image_yolo(temp_image_path)
+        extracted_product_name = extract_product_from_image_yolo(temp_image_path)
 
         # Remove the temporary file
         os.remove(temp_image_path)
         print("Removed temporary file")
 
-        if extracted_product_path:
-            print("Product extracted and saved to:", extracted_product_path)
+        if extracted_product_name:
+            print("Product extracted and saved as:", extracted_product_name)
             return JSONResponse(
                 {
                     "message": "Product extracted successfully",
-                    "product_image_path": extracted_product_path,
-                }
+                    "product_image_name": extracted_product_name,
+                },status_code=200
             )
         else:
             print("Failed to extract the product.")
