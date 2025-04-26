@@ -31,7 +31,7 @@ log_info(f"Using parallel rate limit of {PARALLEL_RATE_LIMIT}")
 llm_semaphore = asyncio.Semaphore(PARALLEL_RATE_LIMIT)
 
 # Load YOLO model
-yolo_model = YOLO("yolov8n-seg.pt")  # Downloaded automatically if needed
+yolo_model = YOLO("yolov8n.pt")  # Downloaded automatically if needed
 UPLOADED_IMAGES_DIR = "uploaded_images"
 if not os.path.exists(UPLOADED_IMAGES_DIR):
     os.makedirs(UPLOADED_IMAGES_DIR)
@@ -57,13 +57,10 @@ def extract_product_from_image_yolo(image_path: str) -> str | None:
     try:
         # Load image
         image = cv2.imread(image_path)
-
-        # Preprocessing: Resize image
-        target_size = (640, 640)
-        image_resized = cv2.resize(image, target_size)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # Run inference with YOLO
-        results = yolo_model(image_resized)
+        results = yolo_model(image, conf=0.2)  # lower confidence for detection
 
         if not results:
             print("No objects detected by YOLO.")
@@ -71,59 +68,34 @@ def extract_product_from_image_yolo(image_path: str) -> str | None:
 
         # Process results
         result = results[0]
-        masks = result.masks
+        boxes = result.boxes
 
-        if masks is None:
-            print("No segmentation masks found by YOLO.")
+        if len(boxes) == 0:
+            print("No objects detected by YOLO.")
             return None
 
-        # Select the largest mask
-        largest_mask_index = np.argmax([mask.area for mask in masks])
-        largest_mask_tensor = masks[largest_mask_index].data.cpu()
-        largest_mask = largest_mask_tensor.numpy().astype(np.uint8)
-
-        # Resize the mask to the original image size
-        largest_mask = cv2.resize(largest_mask, (image.shape[1], image.shape[0]))
-
-        # Postprocessing: Basic mask cleanup (dilation/erosion)
-        kernel = np.ones((5, 5), np.uint8)
-        mask_cleaned = cv2.dilate(largest_mask, kernel, iterations=1)
-        mask_cleaned = cv2.erode(mask_cleaned, kernel, iterations=1)
-        
-        # Create a masked image
-        masked_image = np.zeros_like(image)
-        masked_image[mask_cleaned.astype(bool)] = image[mask_cleaned.astype(bool)]
+        # Get the box with the highest confidence
+        box = boxes[0].xyxy[0].cpu().numpy().astype(int)
+        x_min, y_min, x_max, y_max = box
 
         # Crop the image
-        y_coords, x_coords = np.where(mask_cleaned)
-        x_min, x_max = np.min(x_coords), np.max(x_coords)
-        y_min, y_max = np.min(y_coords), np.max(y_coords)
-        cropped_image = masked_image[y_min:y_max, x_min:x_max]        
+        cropped_image = image[y_min:y_max, x_min:x_max]
 
         # Save the cropped image
-        cropped_image_path = os.path.join(
-            UPLOADED_IMAGES_DIR, f"{uuid.uuid4()}.jpg"
-        )
+        cropped_image_path = os.path.join(UPLOADED_IMAGES_DIR, f"{uuid.uuid4()}.jpg")
         cropped_image_bgr = cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
         cv2.imwrite(cropped_image_path, cropped_image_bgr)
 
         return cropped_image_path
+
     except Exception as e:
-        print(f"Error during image processing: {e}")
+        print(f"Error during YOLO image processing: {e}")
         return None
 
 
 @router.post("/process_image")
 async def process_image(image: UploadFile = File(...)):
-    """
-    Endpoint to process an image and extract the product using SAM.
-
-    Args:
-        image: The uploaded image file.
-
-    Returns:
-        JSON response with the path to the processed image or an error message.
-    """
+    """Process image endpoint using YOLO."""
     try:
         # Save the uploaded image temporarily
         temp_image_filename = f"{uuid.uuid4()}.jpg"
@@ -134,7 +106,7 @@ async def process_image(image: UploadFile = File(...)):
 
         print("Image saved temporarily to:", temp_image_path)
 
-        # Extract the product
+        # Extract the product using YOLO
         extracted_product_path = extract_product_from_image_yolo(temp_image_path)
 
         # Remove the temporary file
@@ -147,7 +119,6 @@ async def process_image(image: UploadFile = File(...)):
                 {
                     "message": "Product extracted successfully",
                     "product_image_path": extracted_product_path,
-                    "image": FileResponse(extracted_product_path, media_type="image/jpeg")
                 }
             )
         else:
@@ -161,6 +132,15 @@ async def process_image(image: UploadFile = File(...)):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@router.get("/get_image/{image_name}")
+async def get_image(image_name: str):
+    """Endpoint to retrieve an image by its name."""
+    image_path = os.path.join(UPLOADED_IMAGES_DIR, image_name)
+    if os.path.exists(image_path):
+        return FileResponse(image_path, media_type="image/jpeg")
+    else:
+        return JSONResponse({"error": "Image not found"}, status_code=404)
+        
 # process single ingredient 
 @router.post("/process_ingredient", response_model=IngredientAnalysisResult)
 @traceable
