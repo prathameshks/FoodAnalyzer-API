@@ -2,11 +2,13 @@ from fastapi import FastAPI
 from routers.auth import router as auth_router
 from routers.analysis import router as analysis_router
 from routers.history import router as history_router
+from routers.product import router as product_router
 
 app = FastAPI()
 
 app.include_router(analysis_router, prefix="/api/analyze")
 app.include_router(auth_router, prefix="/api/auth")
+app.include_router(product_router, prefix="/api/product")
 app.include_router(history_router, prefix="/api/history")
 
 # To run the FastAPI app, use the command: uvicorn main:app --reload
