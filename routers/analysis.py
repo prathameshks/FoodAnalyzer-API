@@ -1,7 +1,8 @@
 import asyncio
 import os
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
 import pytz
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
@@ -14,6 +15,10 @@ from db.database import get_db,SessionLocal
 from db.repositories import IngredientRepository
 from dotenv import load_dotenv
 from langsmith import traceable
+from PIL import Image
+import io
+import base64
+from fastapi.encoders import jsonable_encoder
 
 from services.ingredientFinderAgent import IngredientInfoAgentLangGraph
 from services.productAnalyzerAgent import analyze_product_ingredients
@@ -42,6 +47,26 @@ def ingredient_db_to_pydantic(db_ingredient):
         details_with_source=[source.data for source in db_ingredient.sources]
     )
 
+@router.post("/process_image")
+async def process_image(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+
+        # Convert the image to JPEG format in memory
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format="JPEG")
+        img_byte_arr = img_byte_arr.getvalue()
+        # TODO add ML model to process the image and get the crop coordinates
+        # For testing frontend keeping same image and returning it
+
+        # Encode the JPEG image to base64
+        encoded_string = base64.b64encode(img_byte_arr).decode("utf-8")
+
+        return JSONResponse({"cropped_image": encoded_string})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 # process single ingredient 
 @router.post("/process_ingredient", response_model=IngredientAnalysisResult)
