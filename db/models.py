@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, Text, JSON, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Boolean, Text, JSON, ForeignKey, DateTime
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from .database import Base
 from typing import List, Optional
@@ -36,7 +36,17 @@ class IngredientSource(Base):
     # Relationships
     ingredient = relationship("Ingredient", back_populates="sources")
     
+class Marker(Base):
+    __tablename__ = "markers"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    image_name: Mapped[str]
+    vuforia_id: Mapped[str]
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+
+    product: Mapped["Product"] = relationship(back_populates="markers")
+
 class Product(Base):
+    
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -50,6 +60,8 @@ class Product(Base):
     nutrient_levels = Column(JSON, nullable=True)
     nutriments = Column(JSON, nullable=True)
     data_quality_warnings = Column(JSON, nullable=True)
+    
+    markers: Mapped[List["Marker"]] = relationship(back_populates="product")
 
 
 class User(Base):
