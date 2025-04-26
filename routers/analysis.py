@@ -2,33 +2,21 @@ import asyncio
 import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import pytz
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
-from db.models import User
+from db.models import User, Ingredient
 from interfaces.ingredientModels import IngredientAnalysisResult, IngredientRequest
-from interfaces.productModels import ProductIngredientsRequest
+from interfaces.productModels import ProductIngredientsRequest,ProductData
 from services.auth_service import get_current_user
-from logger_manager import log_info, log_error,logger
+from logger_manager import log_info, log_error, logger
 from db.database import get_db,SessionLocal
-from db.repositories import IngredientRepository
+from db.repositories import IngredientRepository, ProductRepository
 from dotenv import load_dotenv
 from langsmith import traceable
-
-from PIL import Image
 import io
-import base64
-from fastapi.encoders import jsonable_encoder
-import uuid
-from typing import List
-from fastapi import APIRouter, File, Request, UploadFile
-from fastapi.responses import JSONResponse
-import cv2
-import numpy as np
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
-
-
+from ultralytics import YOLO
 from services.ingredientFinderAgent import IngredientInfoAgentLangGraph
 from services.productAnalyzerAgent import analyze_product_ingredients
 
@@ -42,20 +30,8 @@ log_info(f"Using parallel rate limit of {PARALLEL_RATE_LIMIT}")
 # Create a semaphore to limit concurrent API calls
 llm_semaphore = asyncio.Semaphore(PARALLEL_RATE_LIMIT)
 
-
-# SAM model path
-SAM_CHECKPOINT = "models/mobile_sam.pt"  # Replace with your SAM checkpoint file
-
-# SAM model setup
-sam_checkpoint = SAM_CHECKPOINT
-model_type = "vit_t"
-
-# Load SAM model
-sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
-
-# Initialize the mask generator
-mask_generator = SamAutomaticMaskGenerator(sam)
-
+# Load YOLO model
+yolo_model = YOLO("yolov8n-seg.pt")  # Downloaded automatically if needed
 UPLOADED_IMAGES_DIR = "uploaded_images"
 if not os.path.exists(UPLOADED_IMAGES_DIR):
     os.makedirs(UPLOADED_IMAGES_DIR)
@@ -75,41 +51,54 @@ def ingredient_db_to_pydantic(db_ingredient):
         details_with_source=[source.data for source in db_ingredient.sources]
     )
 
-def extract_product_from_image(image_path: str) -> str | None:
-    """
-    Extracts the product image from an image using SAM.
 
-    Args:
-        image_path: Path to the input image.
-
-    Returns:
-        Path to the extracted product image, or None if extraction failed.
-    """
+def extract_product_from_image_yolo(image_path: str) -> str | None:
+    """Extracts the product image using YOLOv8 with preprocessing and postprocessing."""
     try:
-        # Load the image
+        # Load image
         image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # Generate masks
-        masks = mask_generator.generate(image)
+        # Preprocessing: Resize image
+        target_size = (640, 640)
+        image_resized = cv2.resize(image, target_size)
 
-        if not masks:
-            print("No masks generated.")
+        # Run inference with YOLO
+        results = yolo_model(image_resized)
+
+        if not results:
+            print("No objects detected by YOLO.")
             return None
 
-        # Find the largest mask
-        largest_mask = max(masks, key=lambda mask: mask['area'])
-        mask = largest_mask["segmentation"]
+        # Process results
+        result = results[0]
+        masks = result.masks
 
+        if masks is None:
+            print("No segmentation masks found by YOLO.")
+            return None
+
+        # Select the largest mask
+        largest_mask_index = np.argmax([mask.area for mask in masks])
+        largest_mask_tensor = masks[largest_mask_index].data.cpu()
+        largest_mask = largest_mask_tensor.numpy().astype(np.uint8)
+
+        # Resize the mask to the original image size
+        largest_mask = cv2.resize(largest_mask, (image.shape[1], image.shape[0]))
+
+        # Postprocessing: Basic mask cleanup (dilation/erosion)
+        kernel = np.ones((5, 5), np.uint8)
+        mask_cleaned = cv2.dilate(largest_mask, kernel, iterations=1)
+        mask_cleaned = cv2.erode(mask_cleaned, kernel, iterations=1)
+        
         # Create a masked image
         masked_image = np.zeros_like(image)
-        masked_image[mask] = image[mask]
+        masked_image[mask_cleaned.astype(bool)] = image[mask_cleaned.astype(bool)]
 
         # Crop the image
-        y_coords, x_coords = np.where(mask)
+        y_coords, x_coords = np.where(mask_cleaned)
         x_min, x_max = np.min(x_coords), np.max(x_coords)
         y_min, y_max = np.min(y_coords), np.max(y_coords)
-        cropped_image = masked_image[y_min:y_max, x_min:x_max]
+        cropped_image = masked_image[y_min:y_max, x_min:x_max]        
 
         # Save the cropped image
         cropped_image_path = os.path.join(
@@ -122,6 +111,7 @@ def extract_product_from_image(image_path: str) -> str | None:
     except Exception as e:
         print(f"Error during image processing: {e}")
         return None
+
 
 @router.post("/process_image")
 async def process_image(image: UploadFile = File(...)):
@@ -145,7 +135,7 @@ async def process_image(image: UploadFile = File(...)):
         print("Image saved temporarily to:", temp_image_path)
 
         # Extract the product
-        extracted_product_path = extract_product_from_image(temp_image_path)
+        extracted_product_path = extract_product_from_image_yolo(temp_image_path)
 
         # Remove the temporary file
         os.remove(temp_image_path)
@@ -157,6 +147,7 @@ async def process_image(image: UploadFile = File(...)):
                 {
                     "message": "Product extracted successfully",
                     "product_image_path": extracted_product_path,
+                    "image": FileResponse(extracted_product_path, media_type="image/jpeg")
                 }
             )
         else:
@@ -168,6 +159,7 @@ async def process_image(image: UploadFile = File(...)):
     except Exception as e:
         print("Error:", e)
         return JSONResponse({"error": str(e)}, status_code=500)
+
 
 # process single ingredient 
 @router.post("/process_ingredient", response_model=IngredientAnalysisResult)
@@ -257,7 +249,7 @@ async def process_single_ingredient(ingredient_name: str):
 
 @router.post("/process_product_ingredients", response_model=Dict[str, Any])
 @traceable
-async def process_ingredients_endpoint(product_ingredient: ProductIngredientsRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def process_ingredients_endpoint(product_ingredient: ProductIngredientsRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):    
     log_info(f"process_ingredients_endpoint called for {len(product_ingredient.ingredients)} ingredients")
     ingredients = product_ingredient.ingredients
     try:
