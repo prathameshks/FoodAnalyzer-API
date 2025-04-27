@@ -90,11 +90,17 @@ class IngredientRepository:
             self.db.refresh(db_ingredient)
             return db_ingredient
         return None
+
 class ProductRepository:
     def __init__(self, db: Session):
         self.db = db
     
     def add_product(self, product_create: ProductCreate):
+        db_product = self._create_product(product_create)
+        self._store_analysis_data(db_product, product_create.ingredients_analysis)
+        return db_product
+
+    def _create_product(self, product_create: ProductCreate):
         db_product = models.Product(
             product_name=product_create.product_name,
             ingredients=product_create.ingredients,
@@ -114,3 +120,8 @@ class ProductRepository:
         self.db.commit()
         self.db.refresh(db_product)
         return db_product
+
+    def _store_analysis_data(self, db_product, ingredients_analysis):
+        db_product.ingredients_analysis = ingredients_analysis
+        self.db.commit()
+        self.db.refresh(db_product)
