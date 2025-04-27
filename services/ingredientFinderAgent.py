@@ -681,6 +681,7 @@ class IngredientInfoAgentLangGraph:
         # Run each tool directly in sequence and collect results
         logger.info(f"Searching local database for {ingredient}")
         result = search_local_db.invoke(ingredient)
+
         if result.get("found", False):
             sources_data.append(result)
             logger.info(f"Local DB found data for {ingredient}")
@@ -716,20 +717,10 @@ class IngredientInfoAgentLangGraph:
             sources_data.append(result)
             logger.info(f"PubChem found data for {ingredient}")
         
-        # Create a state for analysis
-        state = {
-            "ingredient": ingredient,
-            "sources_data": sources_data,
-            "result": None,
-            "status": "ready_for_analysis",
-            "analysis_done": False,
-            "local_db_checked": True,
-            "web_search_done": True,
-            "wikipedia_checked": True,
-            "open_food_facts_checked": True,
-            "usda_checked": True,
-            "pubchem_checked": True
-        }
+        state = IngredientState(ingredient=ingredient,
+                                 sources_data=sources_data,
+                                 status="ready_for_analysis"
+                                 )
         
         # Run the analysis with the collected data
         final_state = analyze_ingredient(state)
@@ -737,6 +728,7 @@ class IngredientInfoAgentLangGraph:
         # Extract the result or create a default
         if final_state.get("result"):
             logger.info(f"Analysis complete for {ingredient}")
+
             return IngredientAnalysisResult(**final_state["result"])
         else:
             logger.info(f"No result in final state for {ingredient}, returning default")

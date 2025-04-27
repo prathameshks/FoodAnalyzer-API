@@ -51,16 +51,21 @@ class Product(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_name = Column(String, nullable=False)
-    generic_name = Column(String, nullable=True)
-    brands = Column(String, nullable=True)
     ingredients = Column(JSON, nullable=True)
-    ingredients_text = Column(String, nullable=True)
     ingredients_analysis = Column(JSON, nullable=True)
-    nutriscore = Column(JSON, nullable=True)
-    nutrient_levels = Column(JSON, nullable=True)
-    nutriments = Column(JSON, nullable=True)
-    data_quality_warnings = Column(JSON, nullable=True)
+    overall_safety_score = Column(Integer, nullable=True)
+    suitable_diet_types = Column(String, nullable=True)
+    allergy_warnings = Column(JSON, nullable=True)
+    usage_recommendations = Column(String, nullable=True)
+    health_insights = Column(JSON, nullable=True)
+    ingredient_interactions = Column(JSON, nullable=True)
+    key_takeaway = Column(String, nullable=True)
+    ingredients_count = Column(Integer, nullable=True)
+    user_id = Column(Integer, nullable=True)
+    timestamp = Column(DateTime, nullable=True)
+    ingredient_ids= Column(JSON, nullable=True)
     
+    data_quality_warnings = Column(JSON, nullable=True)
     markers: Mapped[List["Marker"]] = relationship(back_populates="product")
 
 
