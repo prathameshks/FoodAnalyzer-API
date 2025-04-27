@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from logger_manager import logger
+from logger_manager import log_error, log_info
 from interfaces.ingredientModels import IngredientAnalysisResult
 
 # Load environment variables
@@ -17,7 +17,7 @@ async def analyze_product_ingredients(
     Analyze multiple ingredients to provide a comprehensive product analysis
     for AR display, considering user preferences and dietary restrictions.
     """
-    logger.info(f"Analyzing product with {len(ingredients_data)} ingredients")
+    log_info(f"Analyzing product with {len(ingredients_data)} ingredients")
     
     # Initialize LLM
     api_key = os.getenv("LLM_API_KEY")
@@ -89,14 +89,18 @@ analysis that would be helpful for a consumer viewing this in an AR application.
     "concerns": (array of strings)
   }},
   "ingredient_interactions": (array of strings),
-  "key_takeaway": (string),
-  "ingredient_ids": (array of integers)
+  "key_takeaway": (string)
 }}
 
 Only include factual information based on the provided data. If information is unavailable for any field, use appropriate default values. If the data required is too obvious then give appropriate answer.
+IMPORTANT: Ensure your response is valid JSON with double quotes (") around property names and string values. 
+Avoid single quotes (') for JSON properties and values.
+Ensure all elements in arrays and objects are separated by commas, and don't include trailing commas.
+Also strictly follow the JSON format in your response.
+
 """
     
-    logger.info("Sending product analysis prompt to LLM")
+    log_info("Sending product analysis prompt to LLM")
     
     try:
         # Process with LLM
@@ -115,10 +119,10 @@ Only include factual information based on the provided data. If information is u
             try:
                 analysis = json.loads(json_match.group(0))
                 analysis["ingredient_ids"] = ingredient_ids
-                logger.info("Successfully parsed product analysis")
+                log_info("Successfully parsed product analysis")
                 return analysis
             except json.JSONDecodeError as e:
-                logger.error(f"JSON parsing error: {e}")
+                log_error(f"JSON parsing error: {e}",e)
                 # Return a simplified analysis on error
                 return {
                     "overall_safety_score": calculate_average_safety(ingredients_data),
@@ -128,7 +132,7 @@ Only include factual information based on the provided data. If information is u
                     "ingredient_ids": ingredient_ids
                 }
         else:
-            logger.error("Could not find JSON in LLM response")
+            log_error("Could not find JSON in LLM response")
             return {
                 "overall_safety_score": calculate_average_safety(ingredients_data),
                 "error": "Failed to generate structured analysis",
@@ -137,7 +141,7 @@ Only include factual information based on the provided data. If information is u
             }
     
     except Exception as e:
-        logger.error(f"Error in product analysis: {e}")
+        log_error(f"Error in product analysis: {e}",e)
         # Fallback analysis based on simple calculations
         return generate_fallback_analysis(ingredients_data, ingredient_ids)
 

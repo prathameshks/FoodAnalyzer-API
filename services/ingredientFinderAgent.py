@@ -10,7 +10,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 # modular
 from interfaces.ingredientModels import IngredientAnalysisResult,IngredientState
-from logger_manager import logger
+from logger_manager import log_debug, log_error, log_info, log_warning
 from utils.agent_tools import search_local_db,search_web,search_wikipedia,search_open_food_facts,search_usda,search_pubchem
 
 # Load environment variables from .env file
@@ -100,7 +100,7 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
     
     # Basic validation
     if not api_key:
-        logger.error("No Google API key found in environment variables")
+        log_error("No Google API key found in environment variables")
         new_state = state.copy()
         new_state["result"] = {
             "name": state["ingredient"],
@@ -120,7 +120,7 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
             # convert_system_message_to_human=True
         )
     except Exception as e:
-        logger.error(f"Error initializing LLM: {e}")
+        log_error(f"Error initializing LLM: {e}",e)
         new_state = state.copy()
         new_state["result"] = {
             "name": state["ingredient"],
@@ -133,11 +133,11 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
     
     # Get sources from state
     sources_data = state["sources_data"]
-    logger.info(f"Analyzing ingredient with {len(sources_data)} total sources")
+    log_info(f"Analyzing ingredient with {len(sources_data)} total sources")
     
     # Filter for successful sources only
     found_sources = [source for source in sources_data if source.get('found', False)]
-    logger.info(f"Found {len(found_sources)} sources with usable data")
+    log_info(f"Found {len(found_sources)} sources with usable data")
     
     # Create default result structure
     result = {
@@ -180,12 +180,12 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
                 
                 source_texts.append(source_text)
             except Exception as e:
-                logger.error(f"Error formatting source {source_name}: {e}")
+                log_error(f"Error formatting source {source_name}: {e}",e)
                 source_texts.append(f"--- {source_name} ---\nError formatting data: {str(e)}")
         
         # Combine all source texts
         combined_data = "\n\n".join(source_texts)
-        logger.info(f"Combined data for analysis:\n{combined_data[:500]}...(truncated)")
+        log_info(f"Combined data for analysis:\n{combined_data[:500]}...(truncated)")
         
         # Create the analysis prompt
         analysis_prompt = f"""
@@ -218,14 +218,14 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
         
         # Process with LLM
         try:
-            logger.info("Sending analysis prompt to LLM")
+            log_info("Sending analysis prompt to LLM")
             llm_response = llm.invoke(analysis_prompt)
-            logger.info("Received LLM response")
+            log_info("Received LLM response")
             
             # Extract and parse JSON from LLM response
             try:
                 analysis_text = llm_response.content
-                logger.debug(f"LLM response: {analysis_text[:500]}...(truncated)")
+                log_debug(f"LLM response: {analysis_text[:500]}...(truncated)")
                 
                 # Find JSON in the response
                 start_idx = analysis_text.find('{')
@@ -244,17 +244,17 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
                         "allergic_info": analysis.get("allergic_info", []),
                         "diet_type": analysis.get("diet_type", "unknown"),
                     })
-                    logger.info(f"Analysis complete - Safety Rating: {result['safety_rating']}")
+                    log_info(f"Analysis complete - Safety Rating: {result['safety_rating']}")
                 else:
-                    logger.warning("Could not find JSON in LLM response")
+                    log_warning("Could not find JSON in LLM response")
                     result["description"] = "Error: Failed to parse LLM analysis output."
             except json.JSONDecodeError as e:
-                logger.error(f"JSON parsing error: {e}")
+                log_error(f"JSON parsing error: {e}",e)
                 result["description"] = f"Error parsing analysis: {str(e)}"
                 
         except Exception as e:
-            logger.error(f"Error in LLM analysis: {e}")
-            logger.error(traceback.format_exc())
+            log_error(f"Error in LLM analysis: {e}",e)
+            log_error(traceback.format_exc())
             result.update({
                 "description": f"Error in analysis: {str(e)}",
                 "health_effects": ["Error in analysis"],
@@ -360,7 +360,7 @@ class IngredientInfoAgentLangGraph:
             tool_name = str(tool_func).split()[0]
         
         source_name = tool_name.replace("search_", "").replace("_", " ").title()
-        logger.info(f"Searching {source_name} for {ingredient}")
+        log_info(f"Searching {source_name} for {ingredient}")
         
         try:
             # Run the tool function in a thread pool to avoid blocking
@@ -368,15 +368,15 @@ class IngredientInfoAgentLangGraph:
             result = await loop.run_in_executor(None, partial(tool_func.invoke, ingredient))
             
             if result.get("found", False):
-                logger.info(f"{source_name} found data for {ingredient}")
+                log_info(f"{source_name} found data for {ingredient}")
             return result
         except Exception as e:
-            logger.error(f"Error in {source_name} search: {e}")
+            log_error(f"Error in {source_name} search: {e}",e)
             return {"source": source_name, "found": False, "error": str(e)}
     
     async def process_ingredient_async(self, ingredient: str) -> IngredientAnalysisResult:
         """Process an ingredient using parallel data fetching."""
-        logger.info(f"=== Parallel processing for: {ingredient} ===")
+        log_info(f"=== Parallel processing for: {ingredient} ===")
         
         # Define all the tools to run in parallel
         tools = [
@@ -417,10 +417,10 @@ class IngredientInfoAgentLangGraph:
         
         # Extract the result or create a default
         if final_state.get("result"):
-            logger.info(f"Analysis complete for {ingredient}")
+            log_info(f"Analysis complete for {ingredient}")
             return IngredientAnalysisResult(**final_state["result"])
         else:
-            logger.info(f"No result in final state for {ingredient}, returning default")
+            log_info(f"No result in final state for {ingredient}, returning default")
             return IngredientAnalysisResult(
                 name=ingredient, 
                 is_found=len(sources_data) > 0, 
@@ -432,49 +432,49 @@ class IngredientInfoAgentLangGraph:
         Process an ingredient using direct sequential approach instead of async.
         This method provides compatibility with synchronous code.
         """
-        logger.info(f"=== Sequential processing for: {ingredient} ===")
+        log_info(f"=== Sequential processing for: {ingredient} ===")
         
         # Initialize empty sources data
         sources_data = []
         
         # Run each tool directly in sequence and collect results
-        logger.info(f"Searching local database for {ingredient}")
+        log_info(f"Searching local database for {ingredient}")
         result = search_local_db.invoke(ingredient)
 
         if result.get("found", False):
             sources_data.append(result)
-            logger.info(f"Local DB found data for {ingredient}")
+            log_info(f"Local DB found data for {ingredient}")
         
-        logger.info(f"Searching web for {ingredient}")
+        log_info(f"Searching web for {ingredient}")
         result = search_web.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
-            logger.info(f"Web search found data for {ingredient}")
+            log_info(f"Web search found data for {ingredient}")
         
-        logger.info(f"Searching Wikipedia for {ingredient}")
+        log_info(f"Searching Wikipedia for {ingredient}")
         result = search_wikipedia.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
-            logger.info(f"Wikipedia found data for {ingredient}")
+            log_info(f"Wikipedia found data for {ingredient}")
         
-        logger.info(f"Searching Open Food Facts for {ingredient}")
+        log_info(f"Searching Open Food Facts for {ingredient}")
         result = search_open_food_facts.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
-            logger.info(f"Open Food Facts found data for {ingredient}")
+            log_info(f"Open Food Facts found data for {ingredient}")
         
         
-        logger.info(f"Searching USDA for {ingredient}")
+        log_info(f"Searching USDA for {ingredient}")
         result = search_usda.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
-            logger.info(f"USDA found data for {ingredient}")
+            log_info(f"USDA found data for {ingredient}")
         
-        logger.info(f"Searching PubChem for {ingredient}")
+        log_info(f"Searching PubChem for {ingredient}")
         result = search_pubchem.invoke(ingredient)
         if result.get("found", False):
             sources_data.append(result)
-            logger.info(f"PubChem found data for {ingredient}")
+            log_info(f"PubChem found data for {ingredient}")
         
         state = IngredientState(ingredient=ingredient,
                                  sources_data=sources_data,
@@ -486,11 +486,11 @@ class IngredientInfoAgentLangGraph:
         
         # Extract the result or create a default
         if final_state.get("result"):
-            logger.info(f"Analysis complete for {ingredient}")
+            log_info(f"Analysis complete for {ingredient}")
 
             return IngredientAnalysisResult(**final_state["result"])
         else:
-            logger.info(f"No result in final state for {ingredient}, returning default")
+            log_info(f"No result in final state for {ingredient}, returning default")
             return IngredientAnalysisResult(
                 name=ingredient, 
                 is_found=len(sources_data) > 0, 

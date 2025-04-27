@@ -19,7 +19,7 @@ def record_scan(db: Session, user_id: int, product_id: int) -> ScanHistory:
         log_info("Scan recorded successfully")
         return scan_entry
     except Exception as e:
-        log_error(f"Error recording scan: {str(e)}")
+        log_error(f"Error recording scan: {str(e)}",e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 def get_scan_history(db: Session, user_id: int) -> list[ScanHistory]:
@@ -32,5 +32,5 @@ def get_scan_history(db: Session, user_id: int) -> list[ScanHistory]:
         log_info("Scan history retrieved successfully")
         return scan_history
     except Exception as e:
-        log_error(f"Error getting scan history: {str(e)}")
+        log_error(f"Error getting scan history: {str(e)}",e)
         raise HTTPException(status_code=500, detail="Internal Server Error")

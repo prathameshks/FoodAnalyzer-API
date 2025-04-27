@@ -75,7 +75,7 @@ async def add_target_to_vuforia(image_name: str, image_path: str) -> str:
             log_error(f"Failed to add target {image_name}: {response.text}")
             raise Exception(f"Failed to add target {image_name}: {response.text}")
     except Exception as e:
-        log_error(f"Error adding target {image_name}: {e}")
+        log_error(f"Error adding target {image_name}: {e}",e)
         raise
 
 
@@ -114,7 +114,7 @@ async def add_product_to_database(
         return True
     except Exception as e:
         db.rollback()
-        log_error(f"Error adding/updating markers for product {product_id} in database: {e}")
+        log_error(f"Error adding/updating markers for product {product_id} in database: {e}",e)
         raise HTTPException(status_code=500, detail=f"Error adding/updating markers for product {product_id}: {e}")
 
 
