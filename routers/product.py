@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 import requests
 import json
 from services.ingredients import IngredientService
+from services.productAnalyzerAgent import analyze_product_ingredients
 
 load_dotenv()
 
@@ -154,6 +155,23 @@ async def create_product(
             ingredient = ingredient_repo.get_ingredient_by_name(ingredient_name)
             if ingredient:
                 product_create_data.ingredient_ids.append(ingredient.id)
+
+        # Analyze product ingredients and store analysis data
+        ingredient_results = []
+        for ingredient_name in product_create_data.ingredients:
+            ingredient = ingredient_repo.get_ingredient_by_name(ingredient_name)
+            if ingredient:
+                ingredient_results.append(ingredient)
+        
+        product_analysis = await analyze_product_ingredients(
+            ingredients_data=ingredient_results,
+            user_preferences={
+                "user_id": product_create_data.user_id,
+                "allergies": None,
+                "dietary_restrictions": None
+            }
+        )
+        product_create_data.ingredients_analysis = product_analysis
 
         # use repository to add product
         product_repo = ProductRepository(db)

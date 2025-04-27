@@ -31,6 +31,7 @@ async def analyze_product_ingredients(
     
     # Prepare ingredient data for the prompt
     ingredients_summary = []
+    ingredient_ids = []
     for i, ingredient in enumerate(ingredients_data):
         ingredient_info = f"""
 Ingredient {i+1}: {ingredient.name}
@@ -41,6 +42,7 @@ Health Effects: {', '.join(ingredient.health_effects) if ingredient.health_effec
 Description: {ingredient.description[:200] + '...' if len(ingredient.description) > 200 else ingredient.description}
 """
         ingredients_summary.append(ingredient_info)
+        ingredient_ids.append(ingredient.id)
     
     # Add user preferences context if available
     user_context = ""
@@ -87,7 +89,8 @@ analysis that would be helpful for a consumer viewing this in an AR application.
     "concerns": (array of strings)
   }},
   "ingredient_interactions": (array of strings),
-  "key_takeaway": (string)
+  "key_takeaway": (string),
+  "ingredient_ids": (array of integers)
 }}
 
 Only include factual information based on the provided data. If information is unavailable for any field, use appropriate default values. If the data required is too obvious then give appropriate answer.
@@ -111,6 +114,7 @@ Only include factual information based on the provided data. If information is u
         if json_match:
             try:
                 analysis = json.loads(json_match.group(0))
+                analysis["ingredient_ids"] = ingredient_ids
                 logger.info("Successfully parsed product analysis")
                 return analysis
             except json.JSONDecodeError as e:
@@ -120,20 +124,22 @@ Only include factual information based on the provided data. If information is u
                     "overall_safety_score": calculate_average_safety(ingredients_data),
                     "error": "Failed to parse complete analysis",
                     "ingredient_count": len(ingredients_data),
-                    "key_takeaway": "Analysis error occurred, please check individual ingredients"
+                    "key_takeaway": "Analysis error occurred, please check individual ingredients",
+                    "ingredient_ids": ingredient_ids
                 }
         else:
             logger.error("Could not find JSON in LLM response")
             return {
                 "overall_safety_score": calculate_average_safety(ingredients_data),
                 "error": "Failed to generate structured analysis",
-                "ingredient_count": len(ingredients_data)
+                "ingredient_count": len(ingredients_data),
+                "ingredient_ids": ingredient_ids
             }
     
     except Exception as e:
         logger.error(f"Error in product analysis: {e}")
         # Fallback analysis based on simple calculations
-        return generate_fallback_analysis(ingredients_data)
+        return generate_fallback_analysis(ingredients_data, ingredient_ids)
 
 
 def calculate_average_safety(ingredients_data: List[IngredientAnalysisResult]) -> float:
@@ -144,7 +150,7 @@ def calculate_average_safety(ingredients_data: List[IngredientAnalysisResult]) -
     return round(sum(safety_scores) / len(safety_scores), 1)
 
 
-def generate_fallback_analysis(ingredients_data: List[IngredientAnalysisResult]) -> Dict[str, Any]:
+def generate_fallback_analysis(ingredients_data: List[IngredientAnalysisResult], ingredient_ids: List[int]) -> Dict[str, Any]:
     """Generate a basic analysis when LLM processing fails."""
     # Extract known allergens
     allergens = []
@@ -176,5 +182,6 @@ def generate_fallback_analysis(ingredients_data: List[IngredientAnalysisResult])
             "benefits": [],
             "concerns": ["Analysis system encountered an error, please check individual ingredients"]
         },
-        "key_takeaway": f"Product has {len(ingredients_data)} ingredients with average safety score of {safety_score}/10"
+        "key_takeaway": f"Product has {len(ingredients_data)} ingredients with average safety score of {safety_score}/10",
+        "ingredient_ids": ingredient_ids
     }
