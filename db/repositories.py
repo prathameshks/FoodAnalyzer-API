@@ -2,8 +2,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import cast, or_, String
 from sqlalchemy.dialects.postgresql import JSONB
 from . import models
-from interfaces.ingredientModels import IngredientAnalysisResult
-
+from interfaces.ingredientModels import IngredientAnalysisResult 
+from interfaces.productModels import ProductCreate
+from datetime import datetime
+    
 class IngredientRepository:
     def __init__(self, db: Session):
         self.db = db
@@ -88,3 +90,27 @@ class IngredientRepository:
             self.db.refresh(db_ingredient)
             return db_ingredient
         return None
+class ProductRepository:
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def add_product(self, product_create: ProductCreate):
+        db_product = models.Product(
+            product_name=product_create.product_name,
+            ingredients=product_create.ingredients,
+            overall_safety_score=product_create.overall_safety_score,
+            suitable_diet_types=product_create.suitable_diet_types,
+            allergy_warnings=product_create.allergy_warnings,
+            usage_recommendations=product_create.usage_recommendations,
+            health_insights=product_create.health_insights,
+            ingredient_interactions=product_create.ingredient_interactions,
+            key_takeaway=product_create.key_takeaway,
+            ingredients_count=product_create.ingredients_count,
+            user_id=product_create.user_id,
+            timestamp=product_create.timestamp,
+            ingredient_ids=product_create.ingredient_ids
+        )
+        self.db.add(db_product)
+        self.db.commit()
+        self.db.refresh(db_product)
+        return db_product
