@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import cast, or_, String
 from sqlalchemy.dialects.postgresql import JSONB
+
+from logger_manager import log_debug, log_error
 from . import models
 from interfaces.ingredientModels import IngredientAnalysisResult 
 from interfaces.productModels import ProductCreate
@@ -14,6 +16,7 @@ class IngredientRepository:
         exact_match = self.db.query(models.Ingredient).filter(models.Ingredient.name.ilike(name)).first()
     
         if exact_match:
+            log_debug(f"Exact match found for ingredient: {name}")
             return exact_match
         
         # If no exact match, try searching in alternate names
@@ -23,10 +26,12 @@ class IngredientRepository:
                 models.Ingredient.alternate_names.cast(JSONB).op('?')(name)
             ).first()
             
+            if alternate_match:
+                log_debug(f"Alternate match found for ingredient: {name}")
+            
             return alternate_match
         except Exception as e:
-            from logger_manager import logger
-            logger.error(f"Error searching alternate names: {e}")
+            log_error(f"Error searching alternate names: {e}",e)
             return None
         
     def get_all_ingredients(self, skip: int = 0, limit: int = 100):

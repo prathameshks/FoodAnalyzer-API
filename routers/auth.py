@@ -23,7 +23,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         log_info("User registered successfully")
         return {"access_token": access_token, "token_type": "bearer"}
     except Exception as e:
-        log_error(f"Error in register endpoint: {str(e)}")
+        log_error(f"Error in register endpoint: {str(e)}",e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @router.post("/login", response_model=Token)
@@ -45,7 +45,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         log_info("User logged in successfully")
         return {"access_token": access_token, "token_type": "bearer"}
     except Exception as e:
-        log_error(f"Error in login endpoint: {str(e)}")
+        log_error(f"Error in login endpoint: {str(e)}",e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @router.get("/user", response_model=UserResponse)
@@ -54,7 +54,7 @@ def read_users_me(current_user: User = Depends(get_current_active_user)):
     try:
         return current_user
     except Exception as e:
-        log_error(f"Error in read_users_me endpoint: {str(e)}")
+        log_error(f"Error in read_users_me endpoint: {str(e)}",e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
         
 @router.get("/user/email", response_model=UserResponse)
@@ -67,5 +67,5 @@ def read_user_by_email(email: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail="User not found")
         return user
     except Exception as e:
-        log_error(f"Error in read_user_by_email endpoint: {str(e)}")
+        log_error(f"Error in read_user_by_email endpoint: {str(e)}",e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
