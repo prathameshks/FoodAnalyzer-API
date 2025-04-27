@@ -26,7 +26,7 @@ def verify_password(plain_password, hashed_password):
     try:
         return pwd_context.verify(plain_password, hashed_password)
     except Exception as e:
-        log_error(f"Error verifying password: {str(e)}")
+        log_error(f"Error verifying password: {str(e)}",e)
         raise HTTPException(status_code=500, detail=str(e))
 
 def get_password_hash(password):
@@ -34,7 +34,7 @@ def get_password_hash(password):
     try:
         return pwd_context.hash(password)
     except Exception as e:
-        log_error(f"Error hashing password: {str(e)}")
+        log_error(f"Error hashing password: {str(e)}",e)
         raise HTTPException(status_code=500, detail=str(e))
 
 def get_user(db, email: str):
@@ -42,7 +42,7 @@ def get_user(db, email: str):
     try:
         return db.query(User).filter(func.lower(User.email) == email.lower()).first()
     except Exception as e:
-        log_error(f"Error getting user: {str(e)}")
+        log_error(f"Error getting user: {str(e)}",e)
         raise HTTPException(status_code=500, detail=str(e))
 
 def authenticate_user(db: Session, username: str, password: str):
@@ -77,10 +77,10 @@ async def get_current_user(db: Session = Depends(get_db), token: str = Depends(o
             raise credentials_exception
         token_data = TokenData(email=email)
     except JWTError as e:
-        log_error(f"JWT error: {str(e)}")
+        log_error(f"JWT error: {str(e)}",e)
         raise credentials_exception
     except Exception as e:
-        log_error(f"Error decoding token: {str(e)}")
+        log_error(f"Error decoding token: {str(e)}",e)
         raise HTTPException(status_code=500, detail=str(e))
     user = get_user(db, email=token_data.email)
     if user is None:
@@ -94,7 +94,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
             raise HTTPException(status_code=400, detail="Inactive user")
         return UserResponse.from_orm(current_user)
     except Exception as e:
-        log_error(f"Error getting current active user: {str(e)}")
+        log_error(f"Error getting current active user: {str(e)}",e)
         raise HTTPException(status_code=500, detail=str(e))
 
 def create_user(db: Session, name: str, email: str, password: str):
@@ -107,5 +107,5 @@ def create_user(db: Session, name: str, email: str, password: str):
         db.refresh(db_user)
         return db_user
     except Exception as e:
-        log_error(f"Error creating user: {str(e)}")
+        log_error(f"Error creating user: {str(e)}",e)
         raise HTTPException(status_code=500, detail=str(e))

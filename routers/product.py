@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 import requests
 import json
 from services.ingredients import IngredientService
+from services.productAnalyzerAgent import analyze_product_ingredients
 
 load_dotenv()
 
@@ -74,7 +75,7 @@ async def add_target_to_vuforia(image_name: str, image_path: str) -> str:
             log_error(f"Failed to add target {image_name}: {response.text}")
             raise Exception(f"Failed to add target {image_name}: {response.text}")
     except Exception as e:
-        log_error(f"Error adding target {image_name}: {e}")
+        log_error(f"Error adding target {image_name}: {e}",e)
         raise
 
 
@@ -113,7 +114,7 @@ async def add_product_to_database(
         return True
     except Exception as e:
         db.rollback()
-        log_error(f"Error adding/updating markers for product {product_id} in database: {e}")
+        log_error(f"Error adding/updating markers for product {product_id} in database: {e}",e)
         raise HTTPException(status_code=500, detail=f"Error adding/updating markers for product {product_id}: {e}")
 
 
@@ -154,6 +155,23 @@ async def create_product(
             ingredient = ingredient_repo.get_ingredient_by_name(ingredient_name)
             if ingredient:
                 product_create_data.ingredient_ids.append(ingredient.id)
+
+        # Analyze product ingredients and store analysis data
+        ingredient_results = []
+        for ingredient_name in product_create_data.ingredients:
+            ingredient = ingredient_repo.get_ingredient_by_name(ingredient_name)
+            if ingredient:
+                ingredient_results.append(ingredient)
+        
+        product_analysis = await analyze_product_ingredients(
+            ingredients_data=ingredient_results,
+            user_preferences={
+                "user_id": product_create_data.user_id,
+                "allergies": None,
+                "dietary_restrictions": None
+            }
+        )
+        product_create_data.ingredients_analysis = product_analysis
 
         # use repository to add product
         product_repo = ProductRepository(db)

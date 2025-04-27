@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 # Define a structured output model
 class IngredientAnalysisResult(BaseModel):
     name: str
+    id: int
     alternate_names: List[str] = Field(default_factory=list)
     is_found: bool = False
     safety_rating: int = 5
