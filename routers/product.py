@@ -6,10 +6,12 @@ from logger_manager import log_info, log_error
 from PIL import Image
 import os
 from services.product_service import ProductService
-from db.models import Marker, Ingredient
+from db.models import Marker
 from sqlalchemy.orm import Session
 from db.database import get_db
 from fastapi import Depends
+from db.repositories import ProductRepository, IngredientRepository
+from interfaces.productModels import ProductCreate
 from typing import Generator
 from dotenv import load_dotenv
 import requests
@@ -126,26 +128,46 @@ async def create_product(
         print("Received data:", data)
 
         # Extract product details and data from request body
-        product_id = data.get("product_id")
-
+        
         image_names: List[str] = data.get("image_names")
+        
+        # Parse ProductCreate model from data
+        product_create_data = ProductCreate(
+            product_name=data.get("name"),
+            ingredients=data.get("ingredients"),
+            overall_safety_score=data.get("overall_safety_score"),
+            suitable_diet_types=data.get("suitable_diet_types"),
+            allergy_warnings=data.get("allergy_warnings"),
+            usage_recommendations=data.get("usage_recommendations"),
+            health_insights=data.get("health_insights"),
+            ingredient_interactions=data.get("ingredient_interactions"),
+            key_takeaway=data.get("key_takeaway"),
+            ingredients_count=data.get("ingredients_count"),
+            user_id=data.get("user_id"),
+            timestamp=data.get("timestamp"),
+            ingredient_ids=[]  
+        )
 
-        product_data = {
-            "ingredients_text": data.get("ingredients_text", ""),
-            "brands": data.get("brands", ""),
-            "generic_name": data.get("generic_name", ""),
-            "nutriscore": data.get("nutriscore", None),
-            "nutrient_levels": data.get("nutrient_levels", None),
-            "nutriments": data.get("nutriments", None),
-            "data_quality_warnings": data.get("data_quality_warnings", None),
-        }
-        product_service = ProductService(db)
-        if not product_id:
-            product = product_service.add_product(data.get("name"), product_data["ingredients_text"])
-            product_id = product.id
-        await add_product_to_database(product_id, image_names, db, product_data)
+        # Find ingredients and append their IDs
+        ingredient_repo = IngredientRepository(db)
+        for ingredient_name in product_create_data.ingredients:
+            ingredient = ingredient_repo.get_ingredient_by_name(ingredient_name)
+            if ingredient:
+                product_create_data.ingredient_ids.append(ingredient.id)
+
+        # use repository to add product
+        product_repo = ProductRepository(db)
+        product = product_repo.add_product(product_create_data)
+        product_id=product.id
+        await add_product_to_database(product_id, image_names, db, data)
         return JSONResponse(
-            {"message": "Product data and image processed successfully"}
+            {
+                 "message": "Product data and image processed successfully",
+                "product_id":product_id,
+                 "data":data,
+                "product_data": product_create_data.model_dump()
+                
+             }
         )
 
     except HTTPException as e:
