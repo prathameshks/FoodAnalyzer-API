@@ -2,11 +2,14 @@
 fastapi==0.115.12
 uvicorn==0.34.0
 python-multipart==0.0.20
+jinja2
 
 # Database
 sqlalchemy==2.0.40
 alembic==1.15.2
 psycopg2-binary==2.9.10
+mysqlclient
+pymysql
 
 # Authentication
 python-jose==3.3.0
