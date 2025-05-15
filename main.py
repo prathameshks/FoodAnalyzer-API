@@ -24,6 +24,19 @@ app = FastAPI()
 def read_root():
     return RedirectResponse("/api")
 
+# print every request data for request using middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # Store the body content before sending to the next handler
+    body_content = await request.body()
+    # Create a new request with the consumed body
+    request._body = body_content
+    response = await call_next(request)
+    print(f"Request: {request.method} {request.url}")
+    print(f"Data: {body_content}")
+    print(f"Headers: {request.headers}")
+    return response
+
 @app.get("/api", response_class=HTMLResponse)
 async def read_api(request: Request):
     return templates.TemplateResponse("api_docs.html", {"request": request})

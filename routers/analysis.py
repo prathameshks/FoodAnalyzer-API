@@ -124,7 +124,7 @@ async def process_image(image: UploadFile = File(...)):
                 {
                     "message": "Product extracted successfully",
                     "product_image_name": extracted_product_name,
-                },status_code=200
+                }, status_code=200
             )
         else:
             print("Failed to extract the product.")
