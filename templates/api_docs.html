@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>FoodAnalyzer API Documentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #333;
+        }
+
+        .endpoint {
+            margin-bottom: 15px;
+            border-left: 4px solid #ddd;
+            padding-left: 15px;
+        }
+
+        .method {
+            font-weight: bold;
+            color: #0066cc;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        pre {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>FoodAnalyzer API Documentation</h1>
+
+    <h2>Authentication Endpoints</h2>
+    <div class="endpoint">
+        <p><span class="method">POST</span> <a href="/api/auth/register">/api/auth/register</a></p>
+        <p>Register a new user in the system</p>
+        <p>Request body:</p>
+        <pre><code>{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "securepassword"
+}</code></pre>
+        <p>Response:</p>
+        <pre><code>{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer"
+}</code></pre>
+    </div>
+
+
+    <div class="endpoint">
+        <p><span class="method">POST</span> <a href="/api/auth/login">/api/auth/login</a></p>
+        <p>Login to get an access token (valid for 4 weeks)</p>
+        <p>Form data: username (email), password</p>
+        <p>Response:</p>
+        <pre><code>{
+"access_token": "eyJhbGciOiJIUzI1NiIs...",
+"token_type": "bearer"
+}</code></pre>
+    </div>
+
+    <div class="endpoint">
+        <p><span class="method">GET</span> <a href="/api/auth/user">/api/auth/user</a></p>
+        <p>Get current authenticated user's information</p>
+        <p>Headers: Authorization: Bearer {token}</p>
+        <p>Response:</p>
+        <pre><code>{
+"name": "John Doe",
+"email": "john@example.com"
+}</code></pre>
+    </div>
+
+    <div class="endpoint">
+        <p><span class="method">GET</span> <a href="/api/auth/user/email">/api/auth/user/email</a></p>
+        <p>Get user information by email</p>
+        <p>Query parameters: email</p>
+    </div>
+
+    <h2>Analysis Endpoints</h2>
+    <div class="endpoint">
+        <p><span class="method">POST</span> <a href="/api/analyze/process_image">/api/analyze/process_image</a></p>
+        <p>Upload and process an image using YOLO object detection</p>
+        <p>Form data: image (file)</p>
+        <p>Response:</p>
+        <pre><code>{
+"message": "Product extracted successfully",
+"product_image_name": "f7e5d4c3-b2a1-4f9e-8d7c-6e5f4d3a2b1c.jpg"
+}</code></pre>
+    </div>
+
+    <div class="endpoint">
+        <p><span class="method">GET</span> <a
+                href="/api/analyze/get_image/{image_name}">/api/analyze/get_image/{image_name}</a></p>
+        <p>Retrieve a processed image by its name</p>
+        <p>Path parameters: image_name</p>
+        <p>Response: Image file (JPEG)</p>
+    </div>
+
+    <div class="endpoint">
+        <p><span class="method">POST</span> <a
+                href="/api/analyze/process_ingredient">/api/analyze/process_ingredient</a></p>
+        <p>Process a single ingredient and get detailed analysis</p>
+        <p>Request body:</p>
+        <pre><code>{
+"name": "Monosodium Glutamate"
+}</code></pre>
+    </div>
+
+    <div class="endpoint">
+        <p><span class="method">POST</span> <a
+                href="/api/analyze/process_product_ingredients">/api/analyze/process_product_ingredients</a></p>
+        <p>Process multiple ingredients of a product</p>
+        <p>Headers: Authorization: Bearer {token}</p>
+        <p>Request body:</p>
+        <pre><code>{
+"ingredients": ["Sugar", "Salt", "Monosodium Glutamate"],
+"user_id": 1
+}</code></pre>
+    </div>
+
+    <h2>Product Endpoints</h2>
+    <div class="endpoint">
+        <p><span class="method">POST</span> <a href="/api/product/add">/api/product/add</a></p>
+        <p>Add a new product with ingredients and images</p>
+        <p>Request body:</p>
+        <pre><code>{
+"name": "Maggi 2-Minute Noodles",
+"image_names": ["maggi_front.jpg", "maggi_ingredients.jpg"],
+"ingredients": [
+"Wheat Flour", 
+"Palm Oil", 
+"Salt", 
+"Monosodium Glutamate"
+],
+"ingredients_count": 4,
+"overall_safety_score": 6.5,
+"suitable_diet_types": ["Vegetarian"],
+"allergy_warnings": ["Contains Wheat (Gluten)"],
+"usage_recommendations": "Consume in moderation",
+"health_insights": [
+"High sodium content may contribute to high blood pressure"
+],
+"ingredient_interactions": [
+"No significant harmful interactions between ingredients"
+],
+"key_takeaway": "Convenient food option but should be consumed occasionally",
+"user_id": 1,
+"timestamp": "2025-04-27T15:30:00Z"
+}</code></pre>
+    </div>
+
+    <h2>History Endpoints</h2>
+    <div class="endpoint">
+        <p><span class="method">POST</span> <a href="/api/history/scan">/api/history/scan</a></p>
+        <p>Record a new product scan in user history</p>
+    </div>
+
+    <div class="endpoint">
+        <p><span class="method">GET</span> <a href="/api/history/user/{user_id}">/api/history/user/{user_id}</a></p>
+        <p>Retrieve scan history for a specific user</p>
+        <p>Path parameters: user_id</p>
+    </div>
+
+    <h2>Authentication</h2>
+    <p>Protected endpoints require JWT token in Authorization header:</p>
+    <p><code>Authorization: Bearer eyJhbGciOiJIUzI1NiIs...</code></p>
+    <p>Tokens are valid for 4 weeks after login.</p>
+</body>
+
+</html>

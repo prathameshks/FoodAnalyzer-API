@@ -14,7 +14,7 @@ console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.ERROR)
 
 # Create a formatter and set it for both handlers
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(pathname)s:%(lineno)d")
 file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)
 
@@ -31,8 +31,11 @@ def log_info(message: str):
 def log_warning(message: str):
     logger.warning(message)
 
-def log_error(message: str):
-    logger.error(message)
+def log_error(message: str, exc: Exception = None):
+    if exc:
+        logger.error(message, exc_info=True)
+    else:
+        logger.error(message)
 
 def log_critical(message: str):
     logger.critical(message)

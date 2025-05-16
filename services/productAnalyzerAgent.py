@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from logger_manager import logger
+from logger_manager import log_error, log_info
 from interfaces.ingredientModels import IngredientAnalysisResult
 
 # Load environment variables
@@ -17,7 +17,7 @@ async def analyze_product_ingredients(
     Analyze multiple ingredients to provide a comprehensive product analysis
     for AR display, considering user preferences and dietary restrictions.
     """
-    logger.info(f"Analyzing product with {len(ingredients_data)} ingredients")
+    log_info(f"Analyzing product with {len(ingredients_data)} ingredients")
     
     # Initialize LLM
     api_key = os.getenv("LLM_API_KEY")
@@ -31,6 +31,7 @@ async def analyze_product_ingredients(
     
     # Prepare ingredient data for the prompt
     ingredients_summary = []
+    ingredient_ids = []
     for i, ingredient in enumerate(ingredients_data):
         ingredient_info = f"""
 Ingredient {i+1}: {ingredient.name}
@@ -41,6 +42,7 @@ Health Effects: {', '.join(ingredient.health_effects) if ingredient.health_effec
 Description: {ingredient.description[:200] + '...' if len(ingredient.description) > 200 else ingredient.description}
 """
         ingredients_summary.append(ingredient_info)
+        ingredient_ids.append(ingredient.id)
     
     # Add user preferences context if available
     user_context = ""
@@ -91,9 +93,14 @@ analysis that would be helpful for a consumer viewing this in an AR application.
 }}
 
 Only include factual information based on the provided data. If information is unavailable for any field, use appropriate default values. If the data required is too obvious then give appropriate answer.
+IMPORTANT: Ensure your response is valid JSON with double quotes (") around property names and string values. 
+Avoid single quotes (') for JSON properties and values.
+Ensure all elements in arrays and objects are separated by commas, and don't include trailing commas.
+Also strictly follow the JSON format in your response.
+
 """
     
-    logger.info("Sending product analysis prompt to LLM")
+    log_info("Sending product analysis prompt to LLM")
     
     try:
         # Process with LLM
@@ -111,29 +118,32 @@ Only include factual information based on the provided data. If information is u
         if json_match:
             try:
                 analysis = json.loads(json_match.group(0))
-                logger.info("Successfully parsed product analysis")
+                analysis["ingredient_ids"] = ingredient_ids
+                log_info("Successfully parsed product analysis")
                 return analysis
             except json.JSONDecodeError as e:
-                logger.error(f"JSON parsing error: {e}")
+                log_error(f"JSON parsing error: {e}",e)
                 # Return a simplified analysis on error
                 return {
                     "overall_safety_score": calculate_average_safety(ingredients_data),
                     "error": "Failed to parse complete analysis",
                     "ingredient_count": len(ingredients_data),
-                    "key_takeaway": "Analysis error occurred, please check individual ingredients"
+                    "key_takeaway": "Analysis error occurred, please check individual ingredients",
+                    "ingredient_ids": ingredient_ids
                 }
         else:
-            logger.error("Could not find JSON in LLM response")
+            log_error("Could not find JSON in LLM response")
             return {
                 "overall_safety_score": calculate_average_safety(ingredients_data),
                 "error": "Failed to generate structured analysis",
-                "ingredient_count": len(ingredients_data)
+                "ingredient_count": len(ingredients_data),
+                "ingredient_ids": ingredient_ids
             }
     
     except Exception as e:
-        logger.error(f"Error in product analysis: {e}")
+        log_error(f"Error in product analysis: {e}",e)
         # Fallback analysis based on simple calculations
-        return generate_fallback_analysis(ingredients_data)
+        return generate_fallback_analysis(ingredients_data, ingredient_ids)
 
 
 def calculate_average_safety(ingredients_data: List[IngredientAnalysisResult]) -> float:
@@ -144,7 +154,7 @@ def calculate_average_safety(ingredients_data: List[IngredientAnalysisResult]) -
     return round(sum(safety_scores) / len(safety_scores), 1)
 
 
-def generate_fallback_analysis(ingredients_data: List[IngredientAnalysisResult]) -> Dict[str, Any]:
+def generate_fallback_analysis(ingredients_data: List[IngredientAnalysisResult], ingredient_ids: List[int]) -> Dict[str, Any]:
     """Generate a basic analysis when LLM processing fails."""
     # Extract known allergens
     allergens = []
@@ -176,5 +186,6 @@ def generate_fallback_analysis(ingredients_data: List[IngredientAnalysisResult])
             "benefits": [],
             "concerns": ["Analysis system encountered an error, please check individual ingredients"]
         },
-        "key_takeaway": f"Product has {len(ingredients_data)} ingredients with average safety score of {safety_score}/10"
+        "key_takeaway": f"Product has {len(ingredients_data)} ingredients with average safety score of {safety_score}/10",
+        "ingredient_ids": ingredient_ids
     }

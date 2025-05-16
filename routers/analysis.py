@@ -14,7 +14,7 @@ from interfaces.productModels import ProductIngredientsRequest
 from services.auth_service import get_current_user
 from PIL import Image
 import cv2
-from logger_manager import log_info, log_error, logger
+from logger_manager import log_info, log_error
 from db.database import get_db,SessionLocal
 from db.repositories import IngredientRepository
 from dotenv import load_dotenv
@@ -49,6 +49,7 @@ def ingredient_db_to_pydantic(db_ingredient):
         name=db_ingredient.name,
         alternate_names=db_ingredient.alternate_names or [],
         is_found=True,
+        id=db_ingredient.id,
         safety_rating=db_ingredient.safety_rating or 5,
         description=db_ingredient.description or "No description available",
         health_effects=db_ingredient.health_effects or ["Unknown"],
@@ -123,7 +124,7 @@ async def process_image(image: UploadFile = File(...)):
                 {
                     "message": "Product extracted successfully",
                     "product_image_name": extracted_product_name,
-                },status_code=200
+                }, status_code=200
             )
         else:
             print("Failed to extract the product.")
@@ -149,14 +150,14 @@ async def get_image(image_name: str):
 @traceable
 async def process_ingredient_endpoint(request: IngredientRequest, db: Session = Depends(get_db)):
     try:
-        logger.info(f"Received request to process ingredient: {request.name}")
+        log_info(f"Received request to process ingredient: {request.name}")
         
         # Check if we already have this ingredient in the database
         repo = IngredientRepository(db)
         db_ingredient = repo.get_ingredient_by_name(request.name)
         
         if db_ingredient:
-            logger.info(f"Found existing ingredient in database: {request.name}")
+            log_info(f"Found existing ingredient in database: {request.name}")
             # Convert DB model to Pydantic model
             # (This would need a function to correctly map the data)
             return ingredient_db_to_pydantic(db_ingredient)
@@ -173,11 +174,11 @@ async def process_ingredient_endpoint(request: IngredientRequest, db: Session = 
         
         # Save to database
         repo.create_ingredient(result)
-        logger.info(f"Saved new ingredient to database: {request.name}")
+        log_info(f"Saved new ingredient to database: {request.name}")
         
         return result
     except Exception as e:
-        logger.error(f"Error processing ingredient: {e}")
+        log_error(f"Error processing ingredient: {e}",e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 async def process_single_ingredient(ingredient_name: str):
@@ -214,7 +215,7 @@ async def process_single_ingredient(ingredient_name: str):
                 
                 return ingredient_data
     except Exception as e:
-        log_error(f"Error processing ingredient {ingredient_name}: {str(e)}")
+        log_error(f"Error processing ingredient {ingredient_name}: {str(e)}",e)
         # Return a minimal result on error to avoid failing the entire batch
         return IngredientAnalysisResult(
             name=ingredient_name,
@@ -262,10 +263,13 @@ async def process_ingredients_endpoint(product_ingredient: ProductIngredientsReq
             } if current_user else {}
         )
         
+        # print("Product analysis result:", product_analysis)
+        
         # Step 3: Prepare final response
         result = {
             "ingredients_count": len(ingredients),
             "processed_ingredients": ingredient_results,
+            "ingredient_ids": product_analysis["ingredient_ids"],
             "overall_analysis": product_analysis,
             "user_id": current_user.id if current_user else None,
             "timestamp": datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
@@ -275,5 +279,5 @@ async def process_ingredients_endpoint(product_ingredient: ProductIngredientsReq
         return result
         
     except Exception as e:
-        log_error(f"Error in process_ingredients_endpoint: {str(e)}")
+        log_error(f"Error in process_ingredients_endpoint: {str(e)}",e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
