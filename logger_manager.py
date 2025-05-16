@@ -24,21 +24,15 @@ logger.addHandler(console_handler)
 
 def log_debug(message: str):
     logger.debug(message)
-    log_info(f"Debug: {message}")
-    log_error(f"Debug: {message}")
 
 def log_info(message: str):
     logger.info(message)
 
 def log_warning(message: str):
     logger.warning(message)
-    log_info(f"Warning: {message}")
-    log_error(f"Warning: {message}")
 
 def log_error(message: str):
     logger.error(message)
 
 def log_critical(message: str):
     logger.critical(message)
-    log_info(f"Critical: {message}")
-    log_error(f"Critical: {message}")

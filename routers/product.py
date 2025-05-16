@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 import requests
 import json
 from services.ingredients import IngredientService
+from utils.fetch_data import fetch_product_data_from_api
 
 load_dotenv()
 
@@ -174,3 +175,20 @@ async def create_product(
         return JSONResponse({"error": e.detail}, status_code=e.status_code)
     except Exception as e:
          return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/find_barcode/{barcode_number}")
+async def find_product_by_barcode(barcode_number: str):
+    """Endpoint to find product data using a barcode number."""
+    log_info(f"Find product by barcode endpoint called for barcode: {barcode_number}")
+    try:
+        product_data = await fetch_product_data_from_api(barcode_number)
+        if product_data:
+            # dump to log file 
+            log_debug(string(product_data))
+            return JSONResponse(product_data)
+        else:
+            raise HTTPException(status_code=404, detail=f"Product not found for barcode: {barcode_number}")
+    except Exception as e:
+        log_error(f"Error fetching product data for barcode {barcode_number}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching product data: {e}")
