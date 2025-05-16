@@ -16,7 +16,7 @@ from typing import Generator
 from dotenv import load_dotenv
 import requests
 import json
-from services.ingredients import IngredientService
+from services.ingredients import IngredientService 
 from services.productAnalyzerAgent import analyze_product_ingredients
 from utils.fetch_data import fetch_product_data_from_api
 
@@ -201,11 +201,16 @@ async def find_product_by_barcode(barcode_number: str):
     log_info(f"Find product by barcode endpoint called for barcode: {barcode_number}")
     try:
         product_data = await fetch_product_data_from_api(barcode_number)
-        if product_data:
-            # dump to log file 
-            log_debug(str(product_data))
-            return JSONResponse(product_data)
+        
+        from utils.fetch_data import extract_product_info  # Import here to avoid circular dependency if utils imports routers
+        
+        found, product_name, ingredients = extract_product_info(product_data)
+
+        if found:
+            return JSONResponse({"found": found, "product_name": product_name, "ingredients": ingredients})
         else:
+            return JSONResponse({"found": found, "product_name": None, "ingredients": []}, status_code=404)
+            # Or raise HTTPException if you prefer
             raise HTTPException(status_code=404, detail=f"Product not found for barcode: {barcode_number}")
     except Exception as e:
         log_error(f"Error fetching product data for barcode {barcode_number}: {e}")
