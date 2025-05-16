@@ -195,7 +195,7 @@ async def create_product(
          return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.get("/find_barcode/{barcode_number}")
+@router.get("/find_barcode")
 async def find_product_by_barcode(barcode_number: str):
     """Endpoint to find product data using a barcode number."""
     log_info(f"Find product by barcode endpoint called for barcode: {barcode_number}")

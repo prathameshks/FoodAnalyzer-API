@@ -33,7 +33,7 @@ async def log_requests(request: Request, call_next):
     request._body = body_content
     response = await call_next(request)
     print(f"Request: {request.method} {request.url}")
-    print(f"Data: {body_content}")
+    # print(f"Data: {body_content}")
     print(f"Headers: {request.headers}")
     return response
 
