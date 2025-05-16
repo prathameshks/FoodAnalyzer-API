@@ -2,7 +2,7 @@ import io
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any
-from logger_manager import log_info, log_error
+from logger_manager import log_debug, log_info, log_error
 from PIL import Image
 import os
 from services.product_service import ProductService
@@ -203,7 +203,7 @@ async def find_product_by_barcode(barcode_number: str):
         product_data = await fetch_product_data_from_api(barcode_number)
         if product_data:
             # dump to log file 
-            log_debug(string(product_data))
+            log_debug(str(product_data))
             return JSONResponse(product_data)
         else:
             raise HTTPException(status_code=404, detail=f"Product not found for barcode: {barcode_number}")
