@@ -116,3 +116,16 @@ class ScanHistory(Base):
 
     # Relationships
     user = relationship("User", back_populates="scan_history")
+
+
+class OpenFoodFactsIngredientsData(Base):
+    __tablename__ = 'open_food_facts_ingredients_data'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ingredient_text = Column(Text, unique=True)
+    open_food_facts_id = Column(String(255))
+    vegan = Column(Integer)
+    vegetarian = Column(Integer)
+    has_allergens = Column(Integer)
+    allergens_tags = Column(Text)
+    # Add other fields as per schema

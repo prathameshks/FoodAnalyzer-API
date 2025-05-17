@@ -18,6 +18,9 @@ from langchain_community.tools import WikipediaQueryRun
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
 from langchain_core.tools import tool
 
+from sqlalchemy.orm import Session
+from db.repositories import OpenFoodFactsRepository # Adjust import
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -257,3 +260,37 @@ def search_web(ingredient: str) -> Dict[str, Any]:
     except Exception as e:
         log_error(f"Web search error: {e}",e)
         return {"source": "DuckDuckGo", "found": False, "error": str(e)}
+
+@tool("get_open_food_facts_ingredient_data")
+def get_open_food_facts_ingredient_data_tool(db_session: Session, ingredient_name: str):
+    """
+    Tool to retrieve Open Food Facts ingredient data from the database.
+
+    Args:
+        db_session: SQLAlchemy database session.
+        ingredient_name: The name or text of the ingredient to look up.
+
+    Returns:
+        A dictionary containing relevant Open Food Facts ingredient data if found, otherwise None.
+    """
+    open_food_facts_repo = OpenFoodFactsRepository(db_session)
+    ingredient_data = open_food_facts_repo.get_open_food_facts_ingredient_data(ingredient_name)
+
+    if ingredient_data:
+        # Format the data to be easily usable by the agent/LLM
+        formatted_data = {
+            "source": "Open Food Facts Database",
+            "found": True, # Indicate that data was found
+            "data": { # Wrap the data in a 'data' key to match your existing structure
+                "ingredient_name": ingredient_data.ingredient_text,
+                "open_food_facts_id": ingredient_data.open_food_facts_id,
+                "vegan_info": "Yes" if ingredient_data.vegan == 1 else ("No" if ingredient_data.vegan == 0 else "Unknown"),
+                "vegetarian_info": "Yes" if ingredient_data.vegetarian == 1 else ("No" if ingredient_data.vegetarian == 0 else "Unknown"),
+                "has_allergens": ingredient_data.has_allergens == 1,
+                "allergens_list": ingredient_data.allergens_tags.split(",") if ingredient_data.allergens_tags else [],
+                # Add other relevant fields from the database table
+            }
+        }
+        return formatted_data
+    else:
+        return {"source": "Open Food Facts Database", "found": False, "data": None} # Return consistent structure
