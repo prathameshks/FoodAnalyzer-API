@@ -1,31 +1,49 @@
 import io
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request, HTTPException, File, UploadFile, Form
+from fastapi.responses import JSONResponse, FileResponse
 from typing import List, Dict, Any
 from logger_manager import log_debug, log_info, log_error
-from PIL import Image
 import os
 from services.product_service import ProductService
-from db.models import Marker
+from db.models import Marker, Product
 from sqlalchemy.orm import Session
+from interfaces.productModels import ProductCreate
+from typing import Generator
+import numpy as np
+import tensorflow as tf # Ensure TensorFlow is imported
+import tensorflow_hub as hub
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+import requests
+from io import BytesIO # Keep BytesIO as it's used with PIL
+
 from db.database import get_db
 from fastapi import Depends
 from db.repositories import ProductRepository, IngredientRepository
-from interfaces.productModels import ProductCreate
-from typing import Generator
+
 from dotenv import load_dotenv
-import requests
-import json
+
+
 from services.ingredients import IngredientService 
 from services.productAnalyzerAgent import analyze_product_ingredients
 from utils.fetch_data import fetch_product_data_from_api
 
+
 load_dotenv()
+
 
 UPLOADED_IMAGES_DIR = "uploaded_images"
 if not os.path.exists(UPLOADED_IMAGES_DIR):
     os.makedirs(UPLOADED_IMAGES_DIR)
 
+
+# TensorFlow model caching
+detector = None
+
+
+def load_detector():
+    global detector
+    if detector is None:
+        detector = hub.load("https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1").signatures['default']
 
 VUFORIA_SERVER_ACCESS_KEY = os.getenv("VUFORIA_SERVER_ACCESS_KEY")
 VUFORIA_SERVER_SECRET_KEY = os.getenv("VUFORIA_SERVER_SECRET_KEY")
@@ -35,88 +53,52 @@ VUFORIA_TARGET_DATABASE_ID = os.getenv("VUFORIA_TARGET_DATABASE_ID")
 router = APIRouter()
 
 
-def get_vuforia_auth_headers():
-    """
-    Returns the authentication headers for Vuforia API requests.
-    """
-    return {
-        "Authorization": f"VWS {VUFORIA_SERVER_ACCESS_KEY}:{VUFORIA_SERVER_SECRET_KEY}",
-        "Content-Type": "application/json",
-    }
+TARGET_CLASSES = set(["Food processor", "Fast food", "Food", "Seafood", "Snack"])
 
+def run_object_detection(image: Image.Image):
+    load_detector()  # Ensure model is loaded
+    image_np = np.array(image)
+    # Convert to tensor without specifying dtype
+    input_tensor = tf.convert_to_tensor(image_np)[tf.newaxis, ...]
+    # Convert to float32 and normalize to [0,1]
+    input_tensor = tf.cast(input_tensor, tf.float32) / 255.0
+    results = detector(input_tensor)
+    results = {k: v.numpy() for k, v in results.items()}
+    return results, image_np
 
-async def add_target_to_vuforia(image_name: str, image_path: str) -> str:
-    """
-    Adds a target to the Vuforia database and returns the Vuforia target ID.
-    """
-    log_info(f"Adding target {image_name} to Vuforia")
+def get_filtered_class_boxes(results):
+    # for same class, keep the one with the highest score
+    # and remove duplicates
+    boxes = []
+    classes = []
+    scores = []
 
-    try:
-        with open(image_path, "rb") as image_file:
-            image_data = image_file.read()
-
-        url = f"https://vws.vuforia.com/targets"
-
-        headers = get_vuforia_auth_headers()
-        payload = {
-            "name": image_name,
-            "width": 1.0,  # Default width
-            "image": image_data.hex(),  # Convert image data to hex
-            "active_flag": True,
-        }
-
-        response = await requests.post(url, headers=headers, json=payload)
-        response_data = json.loads(response.text)
-        if response.status_code == 201:
-            log_info(
-                f"Target {image_name} added successfully with Vuforia ID: {response_data['target_id']}"
-            )
-            return response_data["target_id"]
-        else:
-            log_error(f"Failed to add target {image_name}: {response.text}")
-            raise Exception(f"Failed to add target {image_name}: {response.text}")
-    except Exception as e:
-        log_error(f"Error adding target {image_name}: {e}",e)
-        raise
-
-
-async def add_product_to_database(
-    product_id: int,
-    image_names: List[str],
-    db: Session,
-    product_data: Dict[str, Any],
-):
-    """
-    Adds markers for the product, or updates it if it exists.
-    """
-    try:
-        log_info(f"Adding markers to product with ID {product_id} in database")
-        product_service = ProductService(db)
-        product = product_service.get_product_by_id(product_id)
-        if not product:
-            raise Exception(f"Product with ID {product_id} not found")
-
-        # Add or update markers for the product
-        for image_name in image_names:
-            image_path = os.path.join(UPLOADED_IMAGES_DIR, image_name)
-
-            vuforia_id = await add_target_to_vuforia(image_name, image_path)
-            existing_marker = db.query(Marker).filter_by(image_name=image_name, product_id=product.id).first()
-
-            if not existing_marker:
-                marker = Marker(image_name=image_name, vuforia_id=vuforia_id, product_id=product.id)
-                db.add(marker)
+    for i in range(len(results["detection_scores"])):
+        class_name = results["detection_class_entities"][i].decode("utf-8")
+        box = results["detection_boxes"][i]
+        score = results["detection_scores"][i]
+        if class_name in TARGET_CLASSES:
+            if class_name not in classes:
+                boxes.append(box)
+                classes.append(class_name)
+                scores.append(score)
             else:
-                log_info(f"Marker {image_name} already exists for product {product_id}. Updating Vuforia ID.")
-                existing_marker.vuforia_id = vuforia_id
+                index = classes.index(class_name)
+                if score > scores[index]:
+                    boxes[index] = box
+                    classes[index] = class_name
+                    scores[index] = score
+    return boxes, classes, scores
 
-        db.commit()
-        log_info(f"Product markers added/updated successfully in database")
-        return True
-    except Exception as e:
-        db.rollback()
-        log_error(f"Error adding/updating markers for product {product_id} in database: {e}",e)
-        raise HTTPException(status_code=500, detail=f"Error adding/updating markers for product {product_id}: {e}")
+def crop_image(image_np, box):
+    ymin, xmin, ymax, xmax = box
+    im_width, im_height = image_np.shape[1], image_np.shape[0]
+    (left, right, top, bottom) = (xmin * im_width, xmax * im_width,
+                                    ymin * im_height, ymax * im_height)
+    cropped_image = image_np[int(top):int(bottom), int(left):int(right)]
+    return Image.fromarray(cropped_image)
+
+
 
 
 @router.post("/add")
@@ -195,6 +177,48 @@ async def create_product(
          return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@router.post("/process_image")
+async def process_image_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Receives an image file, performs object detection, and returns information about detected objects.
+    """
+    log_info("Process image endpoint called")
+    try:
+        # Read image from the uploaded file
+        image_data = await file.read()
+        image = Image.open(io.BytesIO(image_data)).convert("RGB")
+
+        # Run object detection
+        results, image_np = run_object_detection(image)
+
+        # Get filtered class boxes
+        boxes, class_names, scores = get_filtered_class_boxes(results)
+
+        detected_objects = []
+        for i in range(len(boxes)):
+            # Crop the detected object
+            cropped_img = crop_image(image_np, boxes[i])
+
+            # Save the cropped image temporarily
+            cropped_image_path = os.path.join(UPLOADED_IMAGES_DIR, f"detected_{class_names[i]}_{scores[i]:.2f}.jpg")
+            cropped_img.save(cropped_image_path)
+
+            # Find if a product with this image exists in the database
+            product_repo = ProductRepository(db)
+            product = product_repo.get_product_by_image_name(os.path.basename(cropped_image_path))
+
+            detected_objects.append({
+                "class_name": class_names[i],
+                "score": float(scores[i]),
+                "product_info": product.to_dict() if product else None  # Assuming Product model has a to_dict method
+            })
+
+        return JSONResponse({"detected_objects": detected_objects})
+    except Exception as e:
+        log_error(f"Error processing image: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error processing image: {e}")
+
+
 @router.get("/find_barcode")
 async def find_product_by_barcode(barcode_number: str):
     """Endpoint to find product data using a barcode number."""
@@ -215,3 +239,13 @@ async def find_product_by_barcode(barcode_number: str):
     except Exception as e:
         log_error(f"Error fetching product data for barcode {barcode_number}: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching product data: {e}")
+
+
+@router.get("/get_image/{image_name}")
+async def get_image(image_name: str):
+    """Endpoint to retrieve an image by its name."""
+    image_path = os.path.join(UPLOADED_IMAGES_DIR, image_name)
+    if os.path.exists(image_path):
+        return FileResponse(image_path, media_type="image/jpeg")
+    else:
+        return JSONResponse({"error": "Image not found"}, status_code=404)

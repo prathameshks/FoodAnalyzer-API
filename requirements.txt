@@ -27,9 +27,8 @@ langgraph==0.3.27
 langsmith==0.3.30
 
 # Computer Vision
-ultralytics==8.3.116
-torch==2.7.0
-torchvision==0.22.0
+tensorflow
+tensorflow_hub
 pillow==11.1.0
 opencv-python==4.11.0.86
 pytesseract==0.3.13
