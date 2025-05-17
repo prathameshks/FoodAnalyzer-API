@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 import os
 import uvicorn
 from pathlib import Path
+import tensorflow as tf
+import tensorflow_hub as hub
 
 load_dotenv()
 # Load environment variables from .env file
@@ -19,6 +21,17 @@ PORT = os.getenv("PORT", 8000)
 templates = Jinja2Templates(directory="templates")
 
 app = FastAPI()
+
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=no INFO, 2=no WARNING, 3=no ERROR
+
+# Store the model as a state variable in the app
+@app.on_event("startup")
+async def startup_event():
+    # Load model once during startup
+    print("Loading TensorFlow model...")
+    app.state.detector = hub.load("https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1").signatures['default']
+    print("TensorFlow model loaded successfully!")
 
 @app.get("/")
 def read_root():

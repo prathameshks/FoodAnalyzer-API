@@ -26,25 +26,12 @@ from dotenv import load_dotenv
 from services.ingredients import IngredientService 
 from services.productAnalyzerAgent import analyze_product_ingredients
 from utils.db_utils import add_product_to_database
+from utils.vuforia_utils import add_target_to_vuforia, UPLOADED_IMAGES_DIR
 from utils.fetch_data import fetch_product_data_from_api
+import uuid
 
 
 load_dotenv()
-
-
-UPLOADED_IMAGES_DIR = "uploaded_images"
-if not os.path.exists(UPLOADED_IMAGES_DIR):
-    os.makedirs(UPLOADED_IMAGES_DIR)
-
-
-# TensorFlow model caching
-detector = None
-
-
-def load_detector():
-    global detector
-    if detector is None:
-        detector = hub.load("https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1").signatures['default']
 
 VUFORIA_SERVER_ACCESS_KEY = os.getenv("VUFORIA_SERVER_ACCESS_KEY")
 VUFORIA_SERVER_SECRET_KEY = os.getenv("VUFORIA_SERVER_SECRET_KEY")
@@ -56,12 +43,11 @@ router = APIRouter()
 
 TARGET_CLASSES = set(["Food processor", "Fast food", "Food", "Seafood", "Snack"])
 
-def run_object_detection(image: Image.Image):
-    load_detector()  # Ensure model is loaded
+def run_object_detection(image: Image.Image, request: Request):
+    # Access the model from app state
+    detector = request.app.state.detector
     image_np = np.array(image)
-    # Convert to tensor without specifying dtype
     input_tensor = tf.convert_to_tensor(image_np)[tf.newaxis, ...]
-    # Convert to float32 and normalize to [0,1]
     input_tensor = tf.cast(input_tensor, tf.float32) / 255.0
     results = detector(input_tensor)
     results = {k: v.numpy() for k, v in results.items()}
@@ -70,26 +56,25 @@ def run_object_detection(image: Image.Image):
 def get_filtered_class_boxes(results):
     # for same class, keep the one with the highest score
     # and remove duplicates
-    boxes = []
-    classes = []
-    scores = []
+    high_boxes = None
+    high_classes = None
+    high_scores = None
 
     for i in range(len(results["detection_scores"])):
         class_name = results["detection_class_entities"][i].decode("utf-8")
         box = results["detection_boxes"][i]
         score = results["detection_scores"][i]
         if class_name in TARGET_CLASSES:
-            if class_name not in classes:
-                boxes.append(box)
-                classes.append(class_name)
-                scores.append(score)
+            if high_boxes is None:
+                high_boxes = box
+                high_classes = class_name
+                high_scores = score
             else:
-                index = classes.index(class_name)
-                if score > scores[index]:
-                    boxes[index] = box
-                    classes[index] = class_name
-                    scores[index] = score
-    return boxes, classes, scores
+                if score > high_scores:
+                    high_boxes = box
+                    high_classes = class_name
+                    high_scores = score
+    return high_boxes, high_classes, high_scores
 
 def crop_image(image_np, box):
     ymin, xmin, ymax, xmax = box
@@ -179,7 +164,7 @@ async def create_product(
 
 
 @router.post("/process_image")
-async def process_image_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def process_image_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db), request: Request = None):
     """
     Receives an image file, performs object detection, and returns information about detected objects.
     """
@@ -189,34 +174,30 @@ async def process_image_endpoint(file: UploadFile = File(...), db: Session = Dep
         image_data = await file.read()
         image = Image.open(io.BytesIO(image_data)).convert("RGB")
 
-        # Run object detection
-        results, image_np = run_object_detection(image)
+        # Run object detection with the request object
+        results, image_np = run_object_detection(image, request)
 
         # Get filtered class boxes
-        boxes, class_names, scores = get_filtered_class_boxes(results)
+        box, class_name, score = get_filtered_class_boxes(results)
 
-        detected_objects = []
-        for i in range(len(boxes)):
             # Crop the detected object
-            cropped_img = crop_image(image_np, boxes[i])
+        cropped_img = crop_image(image_np, box)
 
-            # Save the cropped image temporarily
-            cropped_image_path = os.path.join(UPLOADED_IMAGES_DIR, f"detected_{class_names[i]}_{scores[i]:.2f}.jpg")
-            cropped_img.save(cropped_image_path)
+        # Save the cropped image temporarily
+        unique_id = uuid.uuid4().hex
+        cropped_image_name = f"detected_{class_name}_{score:.2f}_{unique_id}.jpg"
+        cropped_image_path = os.path.join(
+            UPLOADED_IMAGES_DIR, cropped_image_name
+        )
+        cropped_img.save(cropped_image_path)
 
-            # Find if a product with this image exists in the database
-            product_repo = ProductRepository(db)
-            product = product_repo.get_product_by_image_name(os.path.basename(cropped_image_path))
-
-            detected_objects.append({
-                "class_name": class_names[i],
-                "score": float(scores[i]),
-                "product_info": product.to_dict() if product else None  # Assuming Product model has a to_dict method
-            })
-
-        return JSONResponse({"detected_objects": detected_objects})
+        return JSONResponse({
+            "class_name": class_name,
+            "score": float(score),
+            "image_name": cropped_image_name
+        })
     except Exception as e:
-        log_error(f"Error processing image: {e}", exc_info=True)
+        log_error(f"Error processing image: {e}", e)
         raise HTTPException(status_code=500, detail=f"Error processing image: {e}")
 
 
