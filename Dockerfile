@@ -18,5 +18,8 @@ COPY --chown=user . /app
 # Make sure models directory exists
 RUN mkdir -p /app/models
 
-# Run the app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Make sure the script has execute permissions
+RUN chmod +x /app/start.sh
+
+# Run the app using port 7860 (standard for HF Spaces)
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
