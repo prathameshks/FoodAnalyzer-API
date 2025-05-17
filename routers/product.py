@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 
 from services.ingredients import IngredientService 
 from services.productAnalyzerAgent import analyze_product_ingredients
+from utils.db_utils import add_product_to_database
 from utils.fetch_data import fetch_product_data_from_api
 
 

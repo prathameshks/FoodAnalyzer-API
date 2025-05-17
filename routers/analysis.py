@@ -8,13 +8,14 @@ import pytz
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from db.models import User, Ingredient
-from interfaces.ingredientModels import IngredientAnalysisResult
+from interfaces.ingredientModels import IngredientAnalysisResult, IngredientRequest
 from interfaces.productModels import ProductIngredientsRequest
 from logger_manager import log_info, log_error
 from db.database import get_db,SessionLocal
 from db.repositories import IngredientRepository
 from dotenv import load_dotenv
 from langsmith import traceable
+from services.auth_service import get_current_user
 from services.ingredientFinderAgent import IngredientInfoAgentLangGraph
 from services.productAnalyzerAgent import analyze_product_ingredients
 from utils.db_utils import ingredient_db_to_pydantic
