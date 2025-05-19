@@ -164,14 +164,14 @@ async def create_product(
 
 
 @router.post("/process_image")
-async def process_image_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db), request: Request = None):
+async def process_image_endpoint(image: UploadFile = File(...), db: Session = Depends(get_db), request: Request = None):
     """
     Receives an image file, performs object detection, and returns information about detected objects.
     """
     log_info("Process image endpoint called")
     try:
         # Read image from the uploaded file
-        image_data = await file.read()
+        image_data = await image.read()
         image = Image.open(io.BytesIO(image_data)).convert("RGB")
 
         # Run object detection with the request object
@@ -179,8 +179,16 @@ async def process_image_endpoint(file: UploadFile = File(...), db: Session = Dep
 
         # Get filtered class boxes
         box, class_name, score = get_filtered_class_boxes(results)
+        
+        # Check if any objects were detected
+        if box is None:
+            log_info("No food objects detected in image")
+            return JSONResponse({
+                "error": "No food objects detected in the image",
+                "detected": False
+            }, status_code=400)
 
-            # Crop the detected object
+        # Crop the detected object
         cropped_img = crop_image(image_np, box)
 
         # Save the cropped image temporarily
@@ -194,7 +202,8 @@ async def process_image_endpoint(file: UploadFile = File(...), db: Session = Dep
         return JSONResponse({
             "class_name": class_name,
             "score": float(score),
-            "image_name": cropped_image_name
+            "image_name": cropped_image_name,
+            "detected": True
         })
     except Exception as e:
         log_error(f"Error processing image: {e}", e)

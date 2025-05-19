@@ -38,6 +38,7 @@ def read_root():
     return RedirectResponse("/api")
 
 # print every request data for request using middleware
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     # Store the body content before sending to the next handler
@@ -46,7 +47,7 @@ async def log_requests(request: Request, call_next):
     request._body = body_content
     response = await call_next(request)
     print(f"Request: {request.method} {request.url}")
-    # print(f"Data: {body_content}")
+    print(f"Data: {body_content}")
     print(f"Headers: {request.headers}")
     return response
 
