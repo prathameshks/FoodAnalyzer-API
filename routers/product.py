@@ -20,7 +20,6 @@ from db.database import get_db
 from fastapi import Depends
 from db.repositories import ProductRepository, IngredientRepository
 
-from dotenv import load_dotenv
 
 
 from services.ingredients import IngredientService 
@@ -30,13 +29,8 @@ from utils.vuforia_utils import add_target_to_vuforia, UPLOADED_IMAGES_DIR
 from utils.fetch_data import fetch_product_data_from_api
 import uuid
 
-
-load_dotenv()
-
-VUFORIA_SERVER_ACCESS_KEY = os.getenv("VUFORIA_SERVER_ACCESS_KEY")
-VUFORIA_SERVER_SECRET_KEY = os.getenv("VUFORIA_SERVER_SECRET_KEY")
-VUFORIA_TARGET_DATABASE_NAME = os.getenv("VUFORIA_TARGET_DATABASE_NAME")
-VUFORIA_TARGET_DATABASE_ID = os.getenv("VUFORIA_TARGET_DATABASE_ID")
+# import environment variables
+from env import VUFORIA_SERVER_ACCESS_KEY,VUFORIA_SERVER_SECRET_KEY,VUFORIA_TARGET_DATABASE_NAME,VUFORIA_TARGET_DATABASE_ID
 
 router = APIRouter()
 

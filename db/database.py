@@ -2,16 +2,8 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
-# Get database URL from environment variable
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "postgresql://postgres:password@localhost:5432/food_ingredients"
-)
+from env import DATABASE_URL
 
 # Create engine
 engine = create_engine(DATABASE_URL)

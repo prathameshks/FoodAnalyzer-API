@@ -2,12 +2,10 @@ import asyncio
 import os
 
 import pandas as pd
-from dotenv import load_dotenv
 
 from typing import Dict, Any
 # modular
 from logger_manager import log_error, log_info, log_warning
-from dotenv import load_dotenv
 
 import aiohttp
 import time
@@ -20,7 +18,7 @@ from langchain_core.tools import tool
 
 
 # Load environment variables from .env file
-load_dotenv()
+from env import PUBCHEM_MAX_RETRIES, PUBCHEM_TIMEOUT,DUCKDUCKGO_MAX_RETRIES,DUCKDUCKGO_RATE_LIMIT_DELAY,USDA_API_KEY
 
 # Load Scraped Database
 SCRAPED_DB_PATH = "data/Food_Aditives_E_numbers.csv"  # Ensure this file exists
@@ -30,15 +28,6 @@ if os.path.exists(SCRAPED_DB_PATH):
 else:
     additives_df = None
     log_warning("Scraped database not found!")
-
-
-# Define a rate limit (adjust as needed)
-PUBCHEM_TIMEOUT = float(os.getenv("PUBCHEM_TIMEOUT", "2.0"))   # seconds
-PUBCHEM_MAX_RETRIES = int(os.getenv("PUBCHEM_MAX_RETRIES", "3"))  # Max retries
-
-# Rate limiting configuration
-DUCKDUCKGO_RATE_LIMIT_DELAY = float(os.getenv("DUCKDUCKGO_RATE_LIMIT_DELAY", "2.0"))  # Delay in seconds
-DUCKDUCKGO_MAX_RETRIES = int(os.getenv("DUCKDUCKGO_MAX_RETRIES", "3"))  # Max retries
 
 
 # Define tool functions
@@ -98,12 +87,11 @@ def search_usda(ingredient: str) -> Dict[str, Any]:
     
     try:
         usda_api = "https://api.nal.usda.gov/fdc/v1"
-        usda_api_key = os.getenv("USDA_API_KEY", "DEMO_KEY")  # Use DEMO_KEY if not provided
         
         # Search for the ingredient
         search_url = f"{usda_api}/foods/search"
         params = {
-            "api_key": usda_api_key,
+            "api_key": USDA_API_KEY,
             "query": ingredient,
             "dataType": ["Foundation", "SR Legacy", "Branded"],
             "pageSize": 5

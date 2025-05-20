@@ -6,17 +6,14 @@ from db.repositories import IngredientRepository
 from interfaces.ingredientModels import IngredientAnalysisResult
 from logger_manager import log_error, log_info
 from services.ingredientFinderAgent import IngredientInfoAgentLangGraph
-from dotenv import load_dotenv
 from langsmith import traceable
 import pytz
 
 from utils.db_utils import ingredient_db_to_pydantic
 
 # Load environment variables
-load_dotenv()
+from env import PARALLEL_RATE_LIMIT
 
-# Get rate limit from environment variable or use default
-PARALLEL_RATE_LIMIT = int(os.getenv("PARALLEL_RATE_LIMIT", 10))
 
 # Create a semaphore to limit concurrent API calls
 llm_semaphore = asyncio.Semaphore(PARALLEL_RATE_LIMIT)

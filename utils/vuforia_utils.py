@@ -3,19 +3,13 @@ from logger_manager import log_info, log_error
 from PIL import Image
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 import requests
-load_dotenv()
 
 UPLOADED_IMAGES_DIR = "uploaded_images"
 if not os.path.exists(UPLOADED_IMAGES_DIR):
     os.makedirs(UPLOADED_IMAGES_DIR)
 
-
-VUFORIA_SERVER_ACCESS_KEY = os.getenv("VUFORIA_SERVER_ACCESS_KEY")
-VUFORIA_SERVER_SECRET_KEY = os.getenv("VUFORIA_SERVER_SECRET_KEY")
-VUFORIA_TARGET_DATABASE_NAME = os.getenv("VUFORIA_TARGET_DATABASE_NAME")
-VUFORIA_TARGET_DATABASE_ID = os.getenv("VUFORIA_TARGET_DATABASE_ID")
+from env import VUFORIA_SERVER_ACCESS_KEY, VUFORIA_SERVER_SECRET_KEY, VUFORIA_TARGET_DATABASE_NAME, VUFORIA_TARGET_DATABASE_ID
 
 def get_vuforia_auth_headers():
     """

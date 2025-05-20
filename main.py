@@ -6,16 +6,13 @@ from routers.auth import router as auth_router
 from routers.analysis import router as analysis_router
 from routers.history import router as history_router
 from routers.product import router as product_router
-from dotenv import load_dotenv
 import os
 import uvicorn
 from pathlib import Path
 import tensorflow as tf
 import tensorflow_hub as hub
+from env import PORT
 
-load_dotenv()
-# Load environment variables from .env file
-PORT = os.getenv("PORT", 8000)
 
 # Define the templates directory
 templates = Jinja2Templates(directory="templates")
@@ -47,7 +44,7 @@ async def log_requests(request: Request, call_next):
     request._body = body_content
     response = await call_next(request)
     print(f"Request: {request.method} {request.url}")
-    print(f"Data: {body_content}")
+    print(f"Data: {body_content}"[:100])
     print(f"Headers: {request.headers}")
     return response
 

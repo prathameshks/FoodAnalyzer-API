@@ -13,7 +13,6 @@ from interfaces.productModels import ProductIngredientsRequest
 from logger_manager import log_info, log_error
 from db.database import get_db,SessionLocal
 from db.repositories import IngredientRepository
-from dotenv import load_dotenv
 from langsmith import traceable
 from services.auth_service import get_current_user
 from services.ingredientFinderAgent import IngredientInfoAgentLangGraph
@@ -22,10 +21,8 @@ from utils.db_utils import ingredient_db_to_pydantic
 from utils.ingredient_utils import process_single_ingredient
 
 # Load environment variables
-load_dotenv()
+from env import PARALLEL_RATE_LIMIT
 
-# Get rate limit from environment variable or use default
-PARALLEL_RATE_LIMIT = int(os.getenv("PARALLEL_RATE_LIMIT", 10))
 log_info(f"Using parallel rate limit of {PARALLEL_RATE_LIMIT}")
 
 # Create a semaphore to limit concurrent API calls
