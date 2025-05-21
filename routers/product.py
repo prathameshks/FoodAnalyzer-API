@@ -28,9 +28,10 @@ from utils.db_utils import add_product_to_database
 from utils.vuforia_utils import add_target_to_vuforia, UPLOADED_IMAGES_DIR
 from utils.fetch_data import fetch_product_data_from_api
 import uuid
+import json
 
 # import environment variables
-from env import VUFORIA_SERVER_ACCESS_KEY,VUFORIA_SERVER_SECRET_KEY,VUFORIA_TARGET_DATABASE_NAME,VUFORIA_TARGET_DATABASE_ID
+from env import FAKE_TARGET_IMAGE_NAME, SEND_FAKE_TARGET, VUFORIA_SERVER_ACCESS_KEY,VUFORIA_SERVER_SECRET_KEY,VUFORIA_TARGET_DATABASE_NAME,VUFORIA_TARGET_DATABASE_ID
 
 router = APIRouter()
 
@@ -83,33 +84,45 @@ def crop_image(image_np, box):
 
 @router.post("/add")
 async def create_product(
-    request: Request, db: Session = Depends(get_db)
+    request: Request,
+    db: Session = Depends(get_db)
 ):
     """Endpoint to add a new product, its ingredients, and associated markers."""
     try:
         log_info("Create product endpoint called")
-        data = await request.json()
-        print("Received data:", data)
+        # Get the request body
+        form_data = await request.form()
+        name = form_data.get("name")
+        image_name = form_data.get("image_name")
 
-        # Extract product details and data from request body
-        
-        image_names: List[str] = data.get("image_names")
-        
-        # Parse ProductCreate model from data
+        # Extract all ingredients[] fields as a list
+        ingredients_list = []
+        for key, value in form_data.multi_items():
+            if key == "ingredients[]":
+                ingredients_list.append(value)
+                
+        log_debug(f"Received product name: {name}")
+        log_debug(f"Received ingredients: {ingredients_list}")
+        log_debug(f"Received image name: {image_name}")
+            
+        # Save the uploaded image
+        image_path = os.path.join(UPLOADED_IMAGES_DIR, image_name)
+
+        # Create product data model
         product_create_data = ProductCreate(
-            product_name=data.get("name"),
-            ingredients=data.get("ingredients"),
-            overall_safety_score=data.get("overall_safety_score"),
-            suitable_diet_types=data.get("suitable_diet_types"),
-            allergy_warnings=data.get("allergy_warnings"),
-            usage_recommendations=data.get("usage_recommendations"),
-            health_insights=data.get("health_insights"),
-            ingredient_interactions=data.get("ingredient_interactions"),
-            key_takeaway=data.get("key_takeaway"),
-            ingredients_count=data.get("ingredients_count"),
-            user_id=data.get("user_id"),
-            timestamp=data.get("timestamp"),
-            ingredient_ids=[]  
+            product_name=name,
+            ingredients=ingredients_list,
+            overall_safety_score=0,  # Default values
+            suitable_diet_types=[],
+            allergy_warnings=[],
+            usage_recommendations="",
+            health_insights="",
+            ingredient_interactions="",
+            key_takeaway="",
+            ingredients_count=len(ingredients_list),
+            user_id=None,  # Can be updated later if needed
+            timestamp=None,
+            ingredient_ids=[]
         )
 
         # Find ingredients and append their IDs
@@ -119,7 +132,7 @@ async def create_product(
             if ingredient:
                 product_create_data.ingredient_ids.append(ingredient.id)
 
-        # Analyze product ingredients and store analysis data
+        # Analyze product ingredients
         ingredient_results = []
         for ingredient_name in product_create_data.ingredients:
             ingredient = ingredient_repo.get_ingredient_by_name(ingredient_name)
@@ -136,25 +149,26 @@ async def create_product(
         )
         product_create_data.ingredients_analysis = product_analysis
 
-        # use repository to add product
+        # Add product to database
         product_repo = ProductRepository(db)
         product = product_repo.add_product(product_create_data)
-        product_id=product.id
-        await add_product_to_database(product_id, image_names, db, data)
-        return JSONResponse(
-            {
-                 "message": "Product data and image processed successfully",
-                "product_id":product_id,
-                 "data":data,
-                "product_data": product_create_data.model_dump()
-                
-             }
-        )
-
-    except HTTPException as e:
-        return JSONResponse({"error": e.detail}, status_code=e.status_code)
+        
+        # Add Vuforia target if needed
+        await add_product_to_database(product.id, [image_name], db, {
+            "name": name,
+            "ingredients": ingredients,
+            "image_name": image_name,
+        })
+        
+        return JSONResponse({
+            "message": "Product data and image processed successfully",
+            "product_id": product.id,
+            "image_name": image_name
+        })
     except Exception as e:
-         return JSONResponse({"error": str(e)}, status_code=500)
+        log_error(f"Error creating product: {e}", e)
+        print(e)
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @router.post("/process_image")
@@ -177,6 +191,14 @@ async def process_image_endpoint(image: UploadFile = File(...), db: Session = De
         # Check if any objects were detected
         if box is None:
             log_info("No food objects detected in image")
+            # if send dummy target is allowed send default image
+            if SEND_FAKE_TARGET:
+                return JSONResponse({
+                    "class_name": "food",
+                    "score": float(0.24),
+                    "image_name": FAKE_TARGET_IMAGE_NAME,
+                    "detected": True
+                })
             return JSONResponse({
                 "error": "No food objects detected in the image",
                 "detected": False
