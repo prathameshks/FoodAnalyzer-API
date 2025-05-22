@@ -280,3 +280,14 @@ async def get_image(image_name: str):
         return FileResponse(image_path, media_type="image/jpeg")
     else:
         return JSONResponse({"error": "Image not found"}, status_code=404)
+        
+    
+# In your API, add an endpoint like:
+@router.get("/marker/{vuforia_id}")
+async def get_product_by_marker(vuforia_id: str, db: Session = Depends(get_db)):
+    marker = db.query(Marker).filter(Marker.vuforia_id == vuforia_id).first()
+    if not marker:
+        raise HTTPException(status_code=404, detail="Target not found")
+    
+    product = db.query(Product).filter(Product.id == marker.product_id).first()
+    return product
