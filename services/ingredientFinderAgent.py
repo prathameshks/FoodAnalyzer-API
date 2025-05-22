@@ -412,12 +412,34 @@ class IngredientInfoAgentLangGraph:
         # Extract the result or create a default
         if final_state.get("result"):
             log_info(f"Analysis complete for {ingredient}")
-            return IngredientAnalysisResult(**final_state["result"])
+            # Ensure id field is present
+            if "id" not in final_state["result"]:
+                final_state["result"]["id"] = 0  # Will be replaced with actual DB ID
+            
+            result = IngredientAnalysisResult(**final_state["result"])
+            
+            # Save to database using SessionLocal
+            from db.database import SessionLocal
+            from db.repositories import IngredientRepository
+            
+            with SessionLocal() as db:
+                repo = IngredientRepository(db)
+                db_ingredient = repo.create_ingredient(result)
+                # Update with real database ID
+                result.id = db_ingredient.id
+                
+            return result
         else:
             log_info(f"No result in final state for {ingredient}, returning default")
+            # Include id field in default result
             return IngredientAnalysisResult(
                 name=ingredient, 
-                is_found=len(sources_data) > 0, 
+                is_found=len(sources_data) > 0,
+                id=0,  # Required field
+                alternate_names=[],
+                safety_rating=0,
+                description="No reliable information found",
+                health_effects=["Unknown"],
                 details_with_source=sources_data
             )
         

@@ -46,6 +46,8 @@ Description: {ingredient.description[:200] + '...' if len(ingredient.description
         allergies = user_preferences.get("allergies", "None specified")
         diet = user_preferences.get("dietary_restrictions", "None specified")
         user_context = f"""
+## Also consider the following user preferences:
+        
 User has the following preferences:
 - Dietary Restrictions: {diet}
 - Allergies: {allergies}
@@ -62,7 +64,6 @@ analysis that would be helpful for a consumer viewing this in an AR application.
 ## INGREDIENTS INFORMATION:
 {''.join(ingredients_summary)}
 
-## Also consider the following user preferences:
 {user_context}
 
 ## REQUIRED ANALYSIS:

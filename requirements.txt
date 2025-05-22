@@ -2,14 +2,15 @@
 fastapi==0.115.12
 uvicorn==0.34.0
 python-multipart==0.0.20
-jinja2
+jinja2==3.1.6
+aiohttp==3.11.16
 
 # Database
 sqlalchemy==2.0.40
 alembic==1.15.2
 psycopg2-binary==2.9.10
-mysqlclient
-pymysql
+mysqlclient==2.2.7
+pymysql==1.1.1
 
 # Authentication
 python-jose==3.3.0
@@ -19,16 +20,16 @@ bcrypt==4.0.1  # Using 4.0.1 to avoid the attribute error
 # AI & ML
 langchain==0.3.23
 langchain-community==0.3.21
-langchain-google-genai
+langchain-google-genai==2.0.10
 langchain-openai==0.3.12
-google-generativeai
+google-generativeai==0.8.4
 openai==1.73.0
 langgraph==0.3.27
 langsmith==0.3.30
 
 # Computer Vision
-tensorflow
-tensorflow_hub
+tensorflow==2.19.0
+tensorflow_hub==0.16.1
 pillow==11.1.0
 opencv-python==4.11.0.86
 pytesseract==0.3.13

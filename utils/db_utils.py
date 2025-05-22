@@ -7,7 +7,8 @@ from logger_manager import log_info, log_error
 from fastapi import HTTPException
 import os
 from services.product_service import ProductService
-from utils.vuforia_utils import add_target_to_vuforia, UPLOADED_IMAGES_DIR # Assuming add_target_to_vuforia and UPLOADED_IMAGES_DIR are needed and will remain in product.py for now. If they are also moved, the import needs adjustment.
+from utils.vuforia_utils import add_target_to_vuforia
+from env import UPLOADED_IMAGES_DIR # Assuming add_target_to_vuforia and UPLOADED_IMAGES_DIR are needed and will remain in product.py for now. If they are also moved, the import needs adjustment.
 import json
 
 

@@ -1,9 +1,11 @@
+from datetime import datetime
 import io
 from fastapi import APIRouter, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import JSONResponse, FileResponse
 from typing import List, Dict, Any
 from logger_manager import log_debug, log_info, log_error
 import os
+from services.auth_service import get_current_user
 from services.product_service import ProductService
 from db.models import Marker, Product
 from sqlalchemy.orm import Session
@@ -24,14 +26,14 @@ from db.repositories import ProductRepository, IngredientRepository
 
 from services.ingredients import IngredientService 
 from services.productAnalyzerAgent import analyze_product_ingredients
+from utils.analyze import process_product_ingredients
 from utils.db_utils import add_product_to_database
-from utils.vuforia_utils import add_target_to_vuforia, UPLOADED_IMAGES_DIR
 from utils.fetch_data import fetch_product_data_from_api
 import uuid
 import json
 
 # import environment variables
-from env import FAKE_TARGET_IMAGE_NAME, SEND_FAKE_TARGET, VUFORIA_SERVER_ACCESS_KEY,VUFORIA_SERVER_SECRET_KEY,VUFORIA_TARGET_DATABASE_NAME,VUFORIA_TARGET_DATABASE_ID
+from env import FAKE_TARGET_IMAGE_NAME, SEND_FAKE_TARGET,UPLOADED_IMAGES_DIR, VUFORIA_SERVER_ACCESS_KEY,VUFORIA_SERVER_SECRET_KEY,VUFORIA_TARGET_DATABASE_NAME,VUFORIA_TARGET_DATABASE_ID
 
 router = APIRouter()
 
@@ -108,55 +110,77 @@ async def create_product(
         # Save the uploaded image
         image_path = os.path.join(UPLOADED_IMAGES_DIR, image_name)
 
+        # analyze the product ingredients
+        results = await process_product_ingredients(ingredients_list)
+        
+        # extract data from the analysis results 
+        #         result = {
+        #     "ingredients_count": len(product_ingredients),
+        #     "processed_ingredients": ingredient_results,
+        #     "ingredient_ids": product_analysis["ingredient_ids"],
+        #     "overall_analysis": product_analysis,
+        #     "timestamp": datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
+        # }
+        # {{
+        # "overall_safety_score": (number between 1-10),
+        # "suitable_diet_types": (strings from "Vegan", "Vegetarian", "Non-Vegetarian"),
+        # "allergy_warnings": (array of strings),
+        # "usage_recommendations": (string with specific guidance),
+        # "health_insights": {{
+        # "benefits": (array of strings),
+        # "concerns": (array of strings)
+        # }},
+        # "ingredient_interactions": (array of strings),
+        # "key_takeaway": (string)
+        # }}
+        
+        # Check if the analysis results are valid
+        analysis_results = results.get("overall_analysis", {})
+        overall_safety_score = analysis_results.get("overall_safety_score", 0)
+        suitable_diet_types = analysis_results.get("suitable_diet_types", [])
+        allergy_warnings = analysis_results.get("allergy_warnings", [])
+        usage_recommendations = analysis_results.get("usage_recommendations", "")
+        health_insights = analysis_results.get("health_insights", {})
+        ingredient_interactions = analysis_results.get("ingredient_interactions", [])
+        key_takeaway = analysis_results.get("key_takeaway", "")
+        
+        current_user_id = 0
+        try:
+            current_user = await get_current_user()
+            current_user_id = current_user.id
+        except:
+            # Handle case where user is not authenticated
+            log_error("User not authenticated, using default user ID")
+            current_user_id = 0  # Default user ID, change as needed
+        
         # Create product data model
         product_create_data = ProductCreate(
             product_name=name,
-            ingredients=ingredients_list,
-            overall_safety_score=0,  # Default values
-            suitable_diet_types=[],
-            allergy_warnings=[],
-            usage_recommendations="",
-            health_insights="",
-            ingredient_interactions="",
-            key_takeaway="",
-            ingredients_count=len(ingredients_list),
-            user_id=None,  # Can be updated later if needed
-            timestamp=None,
-            ingredient_ids=[]
+            ingredients=json.dumps(ingredients_list),
+            overall_safety_score=overall_safety_score,
+            suitable_diet_types=json.dumps(suitable_diet_types),
+            allergy_warnings=json.dumps(allergy_warnings),
+            usage_recommendations=usage_recommendations,
+            health_insights=json.dumps(health_insights),
+            ingredient_interactions=json.dumps(ingredient_interactions),
+            key_takeaway=json.dumps(key_takeaway),
+            ingredients_count=results.get("ingredients_count", 0),
+            user_id=current_user_id,  # Can be updated later if needed
+            timestamp=results.get("timestamp", datetime.now().isoformat()),
+            ingredient_ids=json.dumps(results.get("ingredient_ids", [])),
         )
 
-        # Find ingredients and append their IDs
-        ingredient_repo = IngredientRepository(db)
-        for ingredient_name in product_create_data.ingredients:
-            ingredient = ingredient_repo.get_ingredient_by_name(ingredient_name)
-            if ingredient:
-                product_create_data.ingredient_ids.append(ingredient.id)
-
-        # Analyze product ingredients
-        ingredient_results = []
-        for ingredient_name in product_create_data.ingredients:
-            ingredient = ingredient_repo.get_ingredient_by_name(ingredient_name)
-            if ingredient:
-                ingredient_results.append(ingredient)
-        
-        product_analysis = await analyze_product_ingredients(
-            ingredients_data=ingredient_results,
-            user_preferences={
-                "user_id": product_create_data.user_id,
-                "allergies": None,
-                "dietary_restrictions": None
-            }
-        )
-        product_create_data.ingredients_analysis = product_analysis
 
         # Add product to database
         product_repo = ProductRepository(db)
         product = product_repo.add_product(product_create_data)
         
+        print(product)
+        
         # Add Vuforia target if needed
         await add_product_to_database(product.id, [image_name], db, {
             "name": name,
-            "ingredients": ingredients,
+            "ingredients": ingredients_list,
             "image_name": image_name,
         })
         

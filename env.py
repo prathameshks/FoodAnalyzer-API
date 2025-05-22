@@ -7,7 +7,10 @@ load_dotenv()
 
 # Environment variables for FoodAnalyzer-API
 PORT = int(os.getenv("PORT", 8000))
-
+UPLOADED_IMAGES_DIR = "uploaded_images"
+if not os.path.exists(UPLOADED_IMAGES_DIR):
+    os.makedirs(UPLOADED_IMAGES_DIR)
+    
 # JWT Secret Key
 SECRET_KEY = os.getenv("SECRET_KEY", "09d8f7a6b5c4e3d2f1a0b9c8d7e6f5a4")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
