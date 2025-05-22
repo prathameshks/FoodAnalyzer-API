@@ -1,7 +1,5 @@
 # Ignore sensitive data
 .env
-alembic.ini
-
 
 debug*
 
@@ -23,5 +21,10 @@ env/
 .idea/
 *.swp
 
+# Ignore uploads directory
 uploaded_images/
+
+# But track this specific file
+!uploaded_images/detected_Snack_0.13_db8318a668504073ad5fd0677187d305.jpg
+
 *.pt
