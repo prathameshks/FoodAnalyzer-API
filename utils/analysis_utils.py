@@ -1,54 +1,167 @@
-from typing import Dict, Any, Optional, Any
+import json
+from datetime import datetime
+import pytz
+from typing import Dict, Any, List, Optional
+from db.models import Product
 from interfaces.productModels import ProductAnalysisResponse
+from logger_manager import log_info, log_error, log_debug
 
-def format_product_analysis_response(product_data: Optional[Any]) -> Optional[ProductAnalysisResponse]:
+def safe_parse_json(value, default=None):
+    """Safely parse a JSON string, with fallback to default value"""
+    if value is None:
+        return default
+    
+    if not isinstance(value, str):
+        return value
+        
+    try:
+        # Handle double-quoted JSON strings (e.g. '"Vegetarian"')
+        parsed = json.loads(value)
+        return parsed
+    except json.JSONDecodeError:
+        # If it's not valid JSON but might be a comma-separated list
+        if ',' in value:
+            return [item.strip() for item in value.split(',')]
+        return default
+
+def format_product_analysis_response(product):
     """
-    Formats the retrieved product analysis data into a consistent response structure.
-
-    Args:
-        product_data: A SQLAlchemy Product object, or None if not found.
-
-    Returns:
-        A ProductAnalysisResponse object or None.
+    Format product data into a ProductAnalysisResponse object with simple error handling.
     """
-    if product_data is None:
-        return None
-
-    # Assuming product_data is a SQLAlchemy Product object
-    safety_score_value = product_data.overall_safety_score
-    safety_score_isPresent = safety_score_value is not None
-
-    return ProductAnalysisResponse(
-        found=True,
-        safety_score={
-            "isPresent": safety_score_isPresent,
-            "value": safety_score_value,
-        },
-        product_info= {
-            "id": product_data.id,
-            "name": product_data.product_name,
-            "barcode": None, # Assuming barcode is not in Product model
-            "image_url": None, # Assuming image_url is not in Product model
-            "brand": None, # Assuming brand is not in Product model
-            "manufacturing_places": None, # Assuming manufacturing_places is not in Product model
-            "stores": None, # Assuming stores is not in Product model
-            "countries": None, # Assuming countries is not in Product model
-        },
-        ingredient_info={
-            "ingredients_text": product_data.ingredients,
-            "ingredients_analysis": product_data.ingredient_interactions, # Assuming ingredient_interactions maps to analysis
-            "additives": None, # Assuming additives are not directly in Product model
-        },
-        allergen_info= {
-            "allergens": product_data.allergy_warnings,
-            "traces": None, # Assuming traces are not directly in Product model
-        },
-        diet_info={
-            "vegan": None, # Assuming vegan is not directly in Product model
-            "vegetarian": None, # Assuming vegetarian is not directly in Product model
-        },
-        nutritional_info=None, # Assuming nutritional_info is not directly in Product model
-        manufacturing_info=None # Assuming manufacturing_info is not directly in Product model
-    )
-
-# Add other helper functions as needed for analysis
+    try:
+        # Print product data for debugging
+        log_debug(f"Product object attributes: {dir(product)}")
+        log_debug(f"Product __dict__: {product.__dict__}")
+        
+        # Extract and parse the dietary flags - handle the specific case that's failing
+        dietary_flags = []
+        try:
+            diet_types = getattr(product, 'suitable_diet_types', None)
+            if diet_types:
+                # Parse the JSON string - handle the case where it's a quoted string like '"Vegetarian"'
+                parsed_diet = safe_parse_json(diet_types, [])
+                if isinstance(parsed_diet, str):
+                    dietary_flags = [parsed_diet]  # Convert single string to list
+                elif isinstance(parsed_diet, list):
+                    dietary_flags = parsed_diet
+        except Exception as e:
+            log_error(f"Error parsing dietary flags: {e}")
+            dietary_flags = []
+        
+        # Parse health insights
+        health_insights = {}
+        try:
+            insights_str = getattr(product, 'health_insights', None)
+            if insights_str:
+                health_insights = safe_parse_json(insights_str, {})
+        except Exception as e:
+            log_error(f"Error parsing health insights: {e}")
+        
+        # Extract warnings and benefits from health insights if available
+        warnings = []
+        benefits = []
+        try:
+            if isinstance(health_insights, dict):
+                warnings = health_insights.get('concerns', [])
+                benefits = health_insights.get('benefits', [])
+        except Exception as e:
+            log_error(f"Error extracting warnings/benefits: {e}")
+        
+        # Parse allergy warnings
+        allergens = []
+        try:
+            allergy_str = getattr(product, 'allergy_warnings', None)
+            if allergy_str:
+                allergens = safe_parse_json(allergy_str, [])
+        except Exception as e:
+            log_error(f"Error parsing allergens: {e}")
+        
+        # Parse ingredients list
+        ingredients_list = []
+        try:
+            ing_list = getattr(product, 'ingredients_list', None) or getattr(product, 'ingredients', None)
+            if ing_list:
+                ingredients_list = safe_parse_json(ing_list, [])
+        except Exception as e:
+            log_error(f"Error parsing ingredients list: {e}")
+        
+        # Parse ingredients analysis if available
+        ingredients_analysis = []
+        try:
+            ing_analysis = getattr(product, 'ingredients_analysis', [])
+            if ing_analysis:
+                if isinstance(ing_analysis, list):
+                    ingredients_analysis = ing_analysis
+                else:
+                    ingredients_analysis = safe_parse_json(ing_analysis, [])
+        except Exception as e:
+            log_error(f"Error parsing ingredients analysis: {e}")
+        
+        # Construct the final response
+        return ProductAnalysisResponse(
+            found=True,
+            basic_info={
+                "product_id": str(product.id),
+                "product_name": getattr(product, 'product_name', ''),
+                "brand": "",
+                "category": "",
+                "image_url": None,
+                "barcode": None
+            },
+            safety_info={
+                "safety_score": float(getattr(product, 'overall_safety_score', 0)),
+                "is_safe": getattr(product, 'overall_safety_score', 0) > 5,
+                "warnings": warnings,
+                "benefits": benefits
+            },
+            ingredient_info={
+                "ingredients_list": ingredients_list,
+                "ingredients_analysis": ingredients_analysis,
+                "ingredient_count": getattr(product, 'ingredients_count', 0)
+            },
+            allergen_info={
+                "allergens": allergens,
+                "has_allergens": len(allergens) > 0
+            },
+            dietary_info={
+                "dietary_flags": dietary_flags,
+                "is_vegetarian": any(flag.lower() == 'vegetarian' for flag in dietary_flags),
+                "is_vegan": any(flag.lower() == 'vegan' for flag in dietary_flags)
+            },
+            timestamp=datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
+        )
+    except Exception as e:
+        log_error(f"Error in format_product_analysis_response: {str(e)}")
+        # Return a minimal valid response rather than raising an exception
+        return ProductAnalysisResponse(
+            found=True,
+            basic_info={
+                "product_id": str(product.id),
+                "product_name": getattr(product, 'product_name', 'Unknown Product'),
+                "brand": "",
+                "category": "",
+                "image_url": None,
+                "barcode": None
+            },
+            safety_info={
+                "safety_score": 0.0,
+                "is_safe": False,
+                "warnings": [],
+                "benefits": []
+            },
+            ingredient_info={
+                "ingredients_list": [],
+                "ingredients_analysis": [],
+                "ingredient_count": 0
+            },
+            allergen_info={
+                "allergens": [],
+                "has_allergens": False
+            },
+            dietary_info={
+                "dietary_flags": [],
+                "is_vegetarian": False,
+                "is_vegan": False
+            },
+            timestamp=datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
+        )

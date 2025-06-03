@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, FileResponse
 import pytz
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
-from db.models import User, Ingredient
+from db.models import Marker, Product, User, Ingredient
 from interfaces.ingredientModels import IngredientAnalysisResult, IngredientRequest
 from interfaces.productModels import ProductIngredientsRequest
 from logger_manager import log_info, log_error
@@ -138,21 +138,65 @@ async def process_ingredients_endpoint(product_ingredient: ProductIngredientsReq
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-@router.get("/get_by_marker_id/{target_id}", response_model=ProductAnalysisResponse)
+@router.get("/get_by_marker_id/{target_id}", response_model=None)
 async def get_analysis_by_marker_id(target_id: str, db: Session = Depends(get_db)):
     """
     Retrieves product analysis and ingredient information by marker ID.
     """
     log_info(f"Received request for analysis by marker ID: {target_id}")
     try:
+        # Check if marker exists
+        marker = db.query(Marker).filter(Marker.vuforia_id == target_id).first()
+        if not marker:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "found": False,
+                    "message": f"Marker with ID {target_id} not found",
+                    "timestamp": datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
+                }
+            )
+            
+        # Check if product exists
+        product = db.query(Product).filter(Product.id == marker.product_id).first()
+        if not product:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "found": False,
+                    "message": f"Product not found for marker ID: {target_id}",
+                    "timestamp": datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
+                }
+            )
+            
+        # Try to get complete product data
         product_data = get_analysis_service_data(db, target_id)
-
+        
+        # If complete data retrieval fails, return minimal data
         if not product_data:
-            raise HTTPException(status_code=404, detail=f"Product not found for marker ID: {target_id}")
-
-        log_info(f"Successfully retrieved product data for marker ID: {target_id}")
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "found": True,
+                    "basic_info": {
+                        "product_id": str(product.id),
+                        "product_name": getattr(product, 'product_name', 'Unknown Product'),
+                    },
+                    "message": "Product found but analysis data could not be processed",
+                    "timestamp": datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
+                }
+            )
+            
         return product_data
 
     except Exception as e:
-        log_error(f"Error in get_analysis_by_marker_id: {str(e)}", e) 
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        log_error(f"Error in get_analysis_by_marker_id: {str(e)}", e)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "found": False,
+                "error": str(e),
+                "message": "Error processing request",
+                "timestamp": datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
+            }
+        )

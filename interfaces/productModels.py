@@ -1,5 +1,5 @@
-from typing import List, Dict, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Add this class to define the request body structure
@@ -21,41 +21,42 @@ class ProductCreate(BaseModel):
     timestamp: datetime
     ingredient_ids: List[int]|str
 
-class SafetyScore(BaseModel):
-    isPresent: bool
-    value: Optional[int] = None
-
-class ProductInfo(BaseModel):
-    id: Optional[int] = None
-    name: Optional[str] = None
-    barcode: Optional[str] = None
+class BasicProductInfo(BaseModel):
+    product_id: str
+    product_name: str
+    brand: Optional[str] = ""
+    category: Optional[str] = ""
     image_url: Optional[str] = None
-    brand: Optional[str] = None
-    manufacturing_places: Optional[str] = None
-    stores: Optional[str] = None
-    countries: Optional[str] = None
+    barcode: Optional[str] = None
+
+class SafetyInfo(BaseModel):
+    safety_score: float = 0
+    is_safe: bool = False
+    warnings: List[str] = []
+    benefits: List[str] = []
 
 class IngredientInfo(BaseModel):
-    ingredients_text: Optional[str] = None
-    ingredients_analysis: Optional[List[Dict[str, Any]]] = None # Adjust type if analysis has a specific structure
-    additives: Optional[List[str]] = None
+    ingredients_list: List[str] = []
+    ingredients_analysis: List[Dict[str, Any]] = []
+    ingredient_count: int = 0
 
 class AllergenInfo(BaseModel):
-    allergens: Optional[List[str]] = None
-    traces: Optional[List[str]] = None
+    allergens: List[str] = []
+    has_allergens: bool = False
 
-class DietInfo(BaseModel):
-    vegan: Optional[bool] = None
-    vegetarian: Optional[bool] = None
+class DietaryInfo(BaseModel):
+    dietary_flags: List[str] = []
+    is_vegetarian: bool = False
+    is_vegan: bool = False
 
 class ProductAnalysisResponse(BaseModel):
-    found: bool
-    safety_score: SafetyScore
-    product_info: Optional[ProductInfo] = None
-    ingredient_info: Optional[IngredientInfo] = None
-    allergen_info: Optional[AllergenInfo] = None
-    diet_info: Optional[DietInfo] = None
-    nutritional_info: Optional[Dict[str, Any]] = None # Adjust type if nutritional info has a specific structure
-    manufacturing_info: Optional[Dict[str, Any]] = None # Adjust type if manufacturing info has a specific structure
+    """Response model for product analysis by marker ID"""
+    found: bool = Field(..., description="Whether the product was found")
+    basic_info: BasicProductInfo = Field(..., description="Basic product information")
+    safety_info: SafetyInfo = Field(..., description="Safety information about the product")
+    ingredient_info: IngredientInfo = Field(..., description="Information about ingredients")
+    allergen_info: AllergenInfo = Field(..., description="Information about allergens")
+    dietary_info: DietaryInfo = Field(..., description="Dietary information")
+    timestamp: str = Field(..., description="Timestamp of the response")
 
 
