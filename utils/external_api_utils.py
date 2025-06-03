@@ -2,12 +2,8 @@ import requests
 import json
 import os
 from logger_manager import log_info, log_error
-from dotenv import load_dotenv
 
-load_dotenv()
-
-VUFORIA_SERVER_ACCESS_KEY = os.getenv("VUFORIA_SERVER_ACCESS_KEY")
-VUFORIA_SERVER_SECRET_KEY = os.getenv("VUFORIA_SERVER_SECRET_KEY")
+from env import VUFORIA_SERVER_ACCESS_KEY, VUFORIA_SERVER_SECRET_KEY
 
 def get_vuforia_auth_headers():
     """

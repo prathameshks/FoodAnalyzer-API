@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import requests
 from io import BytesIO
 import os
-
+from env import UPLOADED_IMAGES_DIR
 
 # Load the model from TF Hub
 # Cache the model globally
@@ -13,10 +13,6 @@ detector = hub.load("https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1")
 
 # Classes you care about
 TARGET_CLASSES = set(["Food processor", "Fast food", "Food", "Seafood", "Snack"])
-
-UPLOADED_IMAGES_DIR = "uploaded_images"
-if not os.path.exists(UPLOADED_IMAGES_DIR):
-    os.makedirs(UPLOADED_IMAGES_DIR)
 
 
 def load_image_from_url(url, size=(640, 480)):

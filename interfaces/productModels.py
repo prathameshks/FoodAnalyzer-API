@@ -8,17 +8,17 @@ class ProductIngredientsRequest(BaseModel):
 
 class ProductCreate(BaseModel):
     product_name: str
-    ingredients: List[str]
+    ingredients: List[str]|str
     overall_safety_score: int
     suitable_diet_types: str
-    allergy_warnings: List[str]
+    allergy_warnings: List[str]|str
     usage_recommendations: str
-    health_insights: Dict[str, List[str]]
-    ingredient_interactions: List[str]
+    health_insights: Dict[str, List[str]]|str
+    ingredient_interactions: List[str]|str
     key_takeaway: str
     ingredients_count: int
     user_id: int
     timestamp: datetime
-    ingredient_ids: List[int]
+    ingredient_ids: List[int]|str
 
 

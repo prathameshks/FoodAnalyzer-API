@@ -1,3 +1,4 @@
+import json
 from sqlalchemy.orm import Session
 from sqlalchemy import cast, or_, String
 from sqlalchemy.dialects.postgresql import JSONB
@@ -38,15 +39,24 @@ class IngredientRepository:
         return self.db.query(models.Ingredient).offset(skip).limit(limit).all()
     
     def create_ingredient(self, ingredient_data: IngredientAnalysisResult):
+        # convert the json data to string using json.dumps
+        name = ingredient_data.name
+        alternate_names = json.dumps(ingredient_data.alternate_names)
+        safety_rating = ingredient_data.safety_rating
+        description = ingredient_data.description
+        health_effects = json.dumps(ingredient_data.health_effects)
+        allergic_info = json.dumps(ingredient_data.allergic_info) if ingredient_data.allergic_info else None
+        diet_type = ingredient_data.diet_type
+        
         # Create ingredient record
         db_ingredient = models.Ingredient(
-            name=ingredient_data.name,
-            alternate_names=ingredient_data.alternate_names,
-            safety_rating=ingredient_data.safety_rating,
-            description=ingredient_data.description,
-            health_effects=ingredient_data.health_effects,
-            allergic_info=ingredient_data.allergic_info,
-            diet_type=ingredient_data.diet_type
+            name=name,
+            alternate_names=alternate_names,
+            safety_rating=safety_rating,
+            description=description,
+            health_effects=health_effects,
+            allergic_info=allergic_info,
+            diet_type=diet_type
         )
         self.db.add(db_ingredient)
         self.db.commit()
@@ -102,7 +112,7 @@ class ProductRepository:
     
     def add_product(self, product_create: ProductCreate):
         db_product = self._create_product(product_create)
-        self._store_analysis_data(db_product, product_create.ingredients_analysis)
+        # self._store_analysis_data(db_product, product_create.ingredients_analysis)
         return db_product
 
     def _create_product(self, product_create: ProductCreate):

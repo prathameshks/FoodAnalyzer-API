@@ -6,25 +6,36 @@ from routers.auth import router as auth_router
 from routers.analysis import router as analysis_router
 from routers.history import router as history_router
 from routers.product import router as product_router
-from dotenv import load_dotenv
 import os
 import uvicorn
 from pathlib import Path
+import tensorflow as tf
+import tensorflow_hub as hub
+from env import PORT
 
-load_dotenv()
-# Load environment variables from .env file
-PORT = os.getenv("PORT", 8000)
 
 # Define the templates directory
 templates = Jinja2Templates(directory="templates")
 
 app = FastAPI()
 
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=no INFO, 2=no WARNING, 3=no ERROR
+
+# Store the model as a state variable in the app
+@app.on_event("startup")
+async def startup_event():
+    # Load model once during startup
+    print("Loading TensorFlow model...")
+    app.state.detector = hub.load("https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1").signatures['default']
+    print("TensorFlow model loaded successfully!")
+
 @app.get("/")
 def read_root():
     return RedirectResponse("/api")
 
 # print every request data for request using middleware
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     # Store the body content before sending to the next handler
@@ -33,7 +44,7 @@ async def log_requests(request: Request, call_next):
     request._body = body_content
     response = await call_next(request)
     print(f"Request: {request.method} {request.url}")
-    # print(f"Data: {body_content}")
+    print(f"Data: {body_content}"[:100])
     print(f"Headers: {request.headers}")
     return response
 

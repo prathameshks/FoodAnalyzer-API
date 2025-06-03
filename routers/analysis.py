@@ -8,7 +8,7 @@ import pytz
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from db.models import User, Ingredient
-from interfaces.ingredientModels import IngredientAnalysisResult
+from interfaces.ingredientModels import IngredientAnalysisResult, IngredientRequest
 from interfaces.productModels import ProductIngredientsRequest
 from logger_manager import log_info, log_error
 from db.database import get_db,SessionLocal
@@ -94,17 +94,30 @@ async def process_ingredients_endpoint(product_ingredient: ProductIngredientsReq
                 
         # Step 2: Generate aggregate analysis with product analyzer agent
         
+        # Safely get user preferences, handling the case where the preferences table doesn't exist
+        user_preferences = {}
+        if current_user:
+            user_preferences["user_id"] = current_user.id
+            try:
+                # Only try to access preferences if the relationship exists
+                if hasattr(current_user, 'preferences') and current_user.preferences:
+                    user_preferences["allergies"] = current_user.preferences[0].allergens
+                    user_preferences["dietary_restrictions"] = current_user.preferences[0].dietary_restrictions
+                else:
+                    user_preferences["allergies"] = None
+                    user_preferences["dietary_restrictions"] = None
+            except Exception as e:
+                log_error(f"Error accessing user preferences: {e}", e)
+                user_preferences["allergies"] = None
+                user_preferences["dietary_restrictions"] = None
+        
         product_analysis = await analyze_product_ingredients(
             ingredients_data=ingredient_results,
-            user_preferences={
-                "user_id": current_user.id,
-                "allergies": current_user.preferences[0].allergens if current_user.preferences else None,
-                "dietary_restrictions": current_user.preferences[0].dietary_restrictions if current_user.preferences else None
-            } if current_user else {}
+            user_preferences=user_preferences
         )
         
         # print("Product analysis result:", product_analysis)
-        
+         
         # Step 3: Prepare final response
         result = {
             "ingredients_count": len(ingredients),
@@ -139,5 +152,5 @@ async def get_analysis_by_marker_id(target_id: str, db: Session = Depends(get_db
         return product_data
 
     except Exception as e:
-        log_error(f"Error in get_analysis_by_marker_id: {str(e)}", e)
+        log_error(f"Error in get_analysis_by_marker_id: {str(e)}", e) 
         raise HTTPException(status_code=500, detail="Internal Server Error")

@@ -1,13 +1,12 @@
 import os
 from typing import List, Dict, Any, Optional
-from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from logger_manager import log_error, log_info
 from interfaces.ingredientModels import IngredientAnalysisResult
 
 # Load environment variables
-load_dotenv()
+from env import LLM_API_KEY, LLM_MODEL_NAME
 
 async def analyze_product_ingredients(
     ingredients_data: List[IngredientAnalysisResult],
@@ -19,13 +18,10 @@ async def analyze_product_ingredients(
     """
     log_info(f"Analyzing product with {len(ingredients_data)} ingredients")
     
-    # Initialize LLM
-    api_key = os.getenv("LLM_API_KEY")
-    model_name = os.getenv("LLM_MODEL_NAME", "gemini-2.0-flash")
-    
+    # Initialize LLM    
     llm = ChatGoogleGenerativeAI(
-        google_api_key=api_key,
-        model=model_name,
+        google_LLM_API_KEY=LLM_API_KEY,
+        model=LLM_MODEL_NAME,
         temperature=0.2  # Lower temperature for more factual responses
     )
     
@@ -50,6 +46,8 @@ Description: {ingredient.description[:200] + '...' if len(ingredient.description
         allergies = user_preferences.get("allergies", "None specified")
         diet = user_preferences.get("dietary_restrictions", "None specified")
         user_context = f"""
+## Also consider the following user preferences:
+        
 User has the following preferences:
 - Dietary Restrictions: {diet}
 - Allergies: {allergies}
@@ -66,7 +64,6 @@ analysis that would be helpful for a consumer viewing this in an AR application.
 ## INGREDIENTS INFORMATION:
 {''.join(ingredients_summary)}
 
-## Also consider the following user preferences:
 {user_context}
 
 ## REQUIRED ANALYSIS:

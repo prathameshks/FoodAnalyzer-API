@@ -3,7 +3,6 @@ from functools import partial
 import os
 import json
 import traceback
-from dotenv import load_dotenv
 from typing import Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -14,9 +13,7 @@ from logger_manager import log_debug, log_error, log_info, log_warning
 from utils.agent_tools import search_local_db,search_web,search_wikipedia,search_open_food_facts,search_usda,search_pubchem
 
 # Load environment variables from .env file
-load_dotenv()
-
-
+from env import GOOGLE_API_KEY, LLM_MODEL_NAME
 
 def create_summary_from_source(source: Dict[str, Any]) -> str:
     """Create a meaningful summary from source data."""
@@ -94,12 +91,9 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
     Returns:
         Updated state with analysis results
     """
-    # Get API key and model from environment
-    api_key = os.getenv("GOOGLE_API_KEY")
-    model_name = os.getenv("LLM_MODEL_NAME", "gemini-1.5-pro")
     
     # Basic validation
-    if not api_key:
+    if not GOOGLE_API_KEY:
         log_error("No Google API key found in environment variables")
         new_state = state.copy()
         new_state["result"] = {
@@ -114,8 +108,8 @@ def analyze_ingredient(state: IngredientState) -> IngredientState:
     # Initialize LLM
     try:
         llm = ChatGoogleGenerativeAI(
-            google_api_key=api_key,
-            model=model_name,
+            google_GOOGLE_API_KEY=GOOGLE_API_KEY,
+            model=LLM_MODEL_NAME,
             temperature=0.3,  # Lower temperature for more factual responses
             # convert_system_message_to_human=True
         )
@@ -418,12 +412,34 @@ class IngredientInfoAgentLangGraph:
         # Extract the result or create a default
         if final_state.get("result"):
             log_info(f"Analysis complete for {ingredient}")
-            return IngredientAnalysisResult(**final_state["result"])
+            # Ensure id field is present
+            if "id" not in final_state["result"]:
+                final_state["result"]["id"] = 0  # Will be replaced with actual DB ID
+            
+            result = IngredientAnalysisResult(**final_state["result"])
+            
+            # Save to database using SessionLocal
+            from db.database import SessionLocal
+            from db.repositories import IngredientRepository
+            
+            with SessionLocal() as db:
+                repo = IngredientRepository(db)
+                db_ingredient = repo.create_ingredient(result)
+                # Update with real database ID
+                result.id = db_ingredient.id
+                
+            return result
         else:
             log_info(f"No result in final state for {ingredient}, returning default")
+            # Include id field in default result
             return IngredientAnalysisResult(
                 name=ingredient, 
-                is_found=len(sources_data) > 0, 
+                is_found=len(sources_data) > 0,
+                id=0,  # Required field
+                alternate_names=[],
+                safety_rating=0,
+                description="No reliable information found",
+                health_effects=["Unknown"],
                 details_with_source=sources_data
             )
         

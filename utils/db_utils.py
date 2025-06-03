@@ -1,3 +1,4 @@
+from typing import Dict, List,Any
 from sqlalchemy.orm import Session
 from interfaces.ingredientModels import IngredientAnalysisResult
 from interfaces.productModels import ProductCreate
@@ -6,21 +7,62 @@ from logger_manager import log_info, log_error
 from fastapi import HTTPException
 import os
 from services.product_service import ProductService
-from routers.product import add_target_to_vuforia, UPLOADED_IMAGES_DIR # Assuming add_target_to_vuforia and UPLOADED_IMAGES_DIR are needed and will remain in product.py for now. If they are also moved, the import needs adjustment.
+from utils.vuforia_utils import add_target_to_vuforia
+from env import UPLOADED_IMAGES_DIR # Assuming add_target_to_vuforia and UPLOADED_IMAGES_DIR are needed and will remain in product.py for now. If they are also moved, the import needs adjustment.
+import json
 
 
 def ingredient_db_to_pydantic(db_ingredient):
     """Convert a database ingredient model to a Pydantic model."""
-    return IngredientAnalysisResult(
-        name=db_ingredient.name,
-        alternate_names=db_ingredient.alternate_names or [],
-        is_found=True,
-        id=db_ingredient.id,
-        safety_rating=db_ingredient.safety_rating or 5,
-        description=db_ingredient.description or "No description available",
-        health_effects=db_ingredient.health_effects or ["Unknown"],
-        details_with_source=[source.data for source in db_ingredient.sources]
-    )
+    try:
+        # Parse string fields that should be lists or dictionaries
+        if isinstance(db_ingredient.alternate_names, str):
+            alternate_names = json.loads(db_ingredient.alternate_names)
+        else:
+            alternate_names = db_ingredient.alternate_names or []
+            
+        if isinstance(db_ingredient.health_effects, str):
+            health_effects = json.loads(db_ingredient.health_effects)
+        else:
+            health_effects = db_ingredient.health_effects or ["Unknown"]
+            
+        # Handle details_with_source, which should be a list of dictionaries
+        if hasattr(db_ingredient, 'sources') and db_ingredient.sources:
+            details = []
+            for source in db_ingredient.sources:
+                if isinstance(source.data, str):
+                    try:
+                        details.append(json.loads(source.data))
+                    except json.JSONDecodeError:
+                        details.append({"source": "Unknown", "data": source.data})
+                else:
+                    details.append(source.data)
+        else:
+            details = []
+            
+        return IngredientAnalysisResult(
+            name=db_ingredient.name,
+            alternate_names=alternate_names,
+            is_found=True,
+            id=db_ingredient.id,
+            safety_rating=db_ingredient.safety_rating or 5,
+            description=db_ingredient.description or "No description available",
+            health_effects=health_effects,
+            details_with_source=details
+        )
+    except Exception as e:
+        log_error(f"Error converting DB ingredient to Pydantic model: {e}", e)
+        # Fallback with minimal valid data
+        return IngredientAnalysisResult(
+            name=db_ingredient.name,
+            alternate_names=[],
+            is_found=True,
+            id=db_ingredient.id,
+            safety_rating=db_ingredient.safety_rating or 5,
+            description=db_ingredient.description or "No description available",
+            health_effects=["Unknown"],
+            details_with_source=[]
+        )
 
 
 async def add_product_to_database(

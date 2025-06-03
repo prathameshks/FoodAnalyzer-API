@@ -1,3 +1,14 @@
+---
+license: mit
+title: Food Analyzer API
+sdk: docker
+emoji: 🔥
+colorFrom: red
+colorTo: purple
+pinned: true
+short_description: Fast API
+---
+
 # FoodAnalyzer-API
 
 ## Installation and Setup
