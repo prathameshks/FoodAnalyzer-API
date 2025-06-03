@@ -22,14 +22,14 @@ def get_product_data_by_marker_id(db: Session, target_id: str):
 
         if not marker:
             log_info(f"No marker found for target ID: {target_id}")
-            return {"found": False, "message": f"No product found for marker ID: {target_id}"}
+            return None
 
         # Get the product associated with the marker
         product = db.query(Product).filter(Product.id == marker.product_id).first()
 
         if not product:
             log_info(f"No product found for product_id: {marker.product_id} linked to marker ID: {target_id}")
-            return {"found": False, "message": f"No product found for marker ID: {target_id}"}
+            return None
 
         log_info(f"Product found for marker ID {target_id}: {product.name}")
 
@@ -40,5 +40,4 @@ def get_product_data_by_marker_id(db: Session, target_id: str):
 
     except Exception as e:
         log_error(f"Error retrieving product data for marker ID {target_id}: {str(e)}", e)
-        # Return a structured error response
-        return {"found": False, "message": "An error occurred while retrieving product data."}
+        return None

@@ -1,6 +1,6 @@
 from typing import Dict, Any, Optional
 
-def format_analysis_response(product_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def format_product_analysis_response(product_data) -> Dict[str, Any]:
     """
     Formats the retrieved product analysis data into a consistent response structure.
 
@@ -22,36 +22,34 @@ def format_analysis_response(product_data: Optional[Dict[str, Any]]) -> Dict[str
             "manufacturing_info": None,
         }
 
-    # Assuming product_data is a dictionary representing the joined data from product, ingredients, etc.
-    # Adjust field names based on your actual database schema and query results.
-    safety_score_value = product_data.get("safety_score")
+    safety_score_value = product_data.safety_score
     safety_score_isPresent = safety_score_value is not None
 
     return {
         "found": True,
         "safety_score": {
-            "calculated": safety_score_calculated,
+            "isPresent": safety_score_isPresent,
             "value": safety_score_value,
         },
         "product_info": {
-            "id": product_data.get("product_id"),
-            "name": product_data.get("product_name"),
-            "barcode": product_data.get("product_barcode"),
-            "image_url": product_data.get("product_image_url"),
-            "brand": product_data.get("product_brand"),
-            "manufacturing_places": product_data.get("product_manufacturing_places"),
-            "stores": product_data.get("product_stores"),
-            "countries": product_data.get("product_countries"),
-        } if product_data.get("product_id") is not None else None,
+            "id": product_data.id,
+            "name": product_data.name,
+            "barcode": product_data.barcode,
+            "image_url": product_data.image_url,
+            "brand": product_data.brand,
+            "manufacturing_places": product_data.manufacturing_places,
+            "stores": product_data.stores,
+            "countries": product_data.countries,
+        } if product_data.id is not None else None,
         "ingredient_info": {
-            "ingredients_text": product_data.get("ingredients_text"),
-            "ingredients_analysis": product_data.get("ingredients_analysis"),
-            "additives": product_data.get("additives"),
-        } if product_data.get("ingredients_text") is not None else None,
+            "ingredients_text": product_data.ingredients_text,
+            "ingredients_analysis": product_data.ingredients_analysis,
+            "additives": product_data.additives,
+        } if product_data.ingredients_text is not None else None,
         "allergen_info": {
-            "allergens": product_data.get("allergens"),
-            "traces": product_data.get("traces"),
-        } if product_data.get("allergens") is not None or product_data.get("traces") is not None else None,
+            "allergens": product_data.allergens,
+            "traces": product_data.traces,
+        } if product_data.allergens is not None or product_data.traces is not None else None,
         "diet_info": {
             "vegan": product_data.get("vegan"),
             "vegetarian": product_data.get("vegetarian"),
