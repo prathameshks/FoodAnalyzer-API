@@ -18,6 +18,7 @@ from langsmith import traceable
 from services.ingredientFinderAgent import IngredientInfoAgentLangGraph
 from services.productAnalyzerAgent import analyze_product_ingredients
 from utils.db_utils import ingredient_db_to_pydantic
+from services.analysis_service import get_product_data_by_marker_id as get_analysis_service_data
 from utils.ingredient_utils import process_single_ingredient
 
 # Load environment variables
@@ -119,4 +120,24 @@ async def process_ingredients_endpoint(product_ingredient: ProductIngredientsReq
         
     except Exception as e:
         log_error(f"Error in process_ingredients_endpoint: {str(e)}",e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@router.get("/get_by_marker_id/{target_id}", response_model=ProductAnalysisResponse)
+async def get_analysis_by_marker_id(target_id: str, db: Session = Depends(get_db)):
+    """
+    Retrieves product analysis and ingredient information by marker ID.
+    """
+    log_info(f"Received request for analysis by marker ID: {target_id}")
+    try:
+        product_data = get_analysis_service_data(db, target_id)
+
+        if not product_data:
+            raise HTTPException(status_code=404, detail=f"Product not found for marker ID: {target_id}")
+
+        log_info(f"Successfully retrieved product data for marker ID: {target_id}")
+        return product_data
+
+    except Exception as e:
+        log_error(f"Error in get_analysis_by_marker_id: {str(e)}", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
