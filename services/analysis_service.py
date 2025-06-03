@@ -2,8 +2,10 @@ from sqlalchemy.orm import Session
 from db.models import Marker, Product
 from utils.analysis_utils import format_product_analysis_response
 from utils.logger_manager import log_info, log_error
+from interfaces.productModels import ProductAnalysisResponse
+from typing import Optional
 
-def get_product_data_by_marker_id(db: Session, target_id: str):
+def get_product_data_by_marker_id(db: Session, target_id: str) -> Optional[ProductAnalysisResponse]:
     """
     Retrieves product analysis and ingredient information by marker ID.
 
@@ -12,8 +14,8 @@ def get_product_data_by_marker_id(db: Session, target_id: str):
         target_id: The target ID from the marker table.
 
     Returns:
-        A dictionary containing product analysis and ingredient information,
-        or None if no product is found.
+        A ProductAnalysisResponse object or None if no product is found.
+
     """
     log_info(f"Attempting to retrieve product data for marker ID: {target_id}")
     try:
