@@ -37,7 +37,7 @@ class SafetyInfo(BaseModel):
 
 class IngredientInfo(BaseModel):
     ingredients_list: List[str] = []
-    ingredients_analysis: List[Dict[str, Any]] = []
+    # ingredients_analysis: List[Dict[str, Any]] = []
     ingredient_count: int = 0
 
 class AllergenInfo(BaseModel):
@@ -49,6 +49,11 @@ class DietaryInfo(BaseModel):
     is_vegetarian: bool = False
     is_vegan: bool = False
 
+class RecommendationsInfo(BaseModel):
+    usage_recommendations: str = ""
+    ingredient_interactions: List[str] = []
+    key_takeaway: str = ""
+
 class ProductAnalysisResponse(BaseModel):
     """Response model for product analysis by marker ID"""
     found: bool = Field(..., description="Whether the product was found")
@@ -57,6 +62,7 @@ class ProductAnalysisResponse(BaseModel):
     ingredient_info: IngredientInfo = Field(..., description="Information about ingredients")
     allergen_info: AllergenInfo = Field(..., description="Information about allergens")
     dietary_info: DietaryInfo = Field(..., description="Dietary information")
+    recommendations_info: RecommendationsInfo = Field(..., description="Recommendations and key insights")
     timestamp: str = Field(..., description="Timestamp of the response")
 
 

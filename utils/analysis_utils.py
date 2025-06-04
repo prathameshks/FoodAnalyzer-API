@@ -97,6 +97,42 @@ def format_product_analysis_response(product):
         except Exception as e:
             log_error(f"Error parsing ingredients analysis: {e}")
         
+        # Parse ingredient interactions
+        ingredient_interactions = []
+        try:
+            interactions_str = getattr(product, 'ingredient_interactions', None)
+            if interactions_str:
+                ingredient_interactions = safe_parse_json(interactions_str, [])
+        except Exception as e:
+            log_error(f"Error parsing ingredient interactions: {e}")
+            ingredient_interactions = []
+        
+        # Get usage recommendations
+        usage_recommendations = ""
+        try:
+            usage_recommendations = getattr(product, 'usage_recommendations', "")
+            if usage_recommendations and isinstance(usage_recommendations, str):
+                if usage_recommendations.startswith('"') and usage_recommendations.endswith('"'):
+                    usage_recommendations = safe_parse_json(usage_recommendations, "")
+            if not isinstance(usage_recommendations, str):
+                usage_recommendations = str(usage_recommendations)
+        except Exception as e:
+            log_error(f"Error parsing usage recommendations: {e}")
+            usage_recommendations = ""
+        
+        # Get key takeaway
+        key_takeaway = ""
+        try:
+            key_takeaway = getattr(product, 'key_takeaway', "")
+            if key_takeaway and isinstance(key_takeaway, str):
+                if key_takeaway.startswith('"') and key_takeaway.endswith('"'):
+                    key_takeaway = safe_parse_json(key_takeaway, "")
+            if not isinstance(key_takeaway, str):
+                key_takeaway = str(key_takeaway)
+        except Exception as e:
+            log_error(f"Error parsing key takeaway: {e}")
+            key_takeaway = ""
+        
         # Construct the final response
         return ProductAnalysisResponse(
             found=True,
@@ -116,7 +152,7 @@ def format_product_analysis_response(product):
             },
             ingredient_info={
                 "ingredients_list": ingredients_list,
-                "ingredients_analysis": ingredients_analysis,
+                # "ingredients_analysis": ingredients_analysis,
                 "ingredient_count": getattr(product, 'ingredients_count', 0)
             },
             allergen_info={
@@ -127,6 +163,11 @@ def format_product_analysis_response(product):
                 "dietary_flags": dietary_flags,
                 "is_vegetarian": any(flag.lower() == 'vegetarian' for flag in dietary_flags),
                 "is_vegan": any(flag.lower() == 'vegan' for flag in dietary_flags)
+            },
+            recommendations_info={
+                "usage_recommendations": usage_recommendations,
+                "ingredient_interactions": ingredient_interactions,
+                "key_takeaway": key_takeaway
             },
             timestamp=datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
         )
@@ -151,7 +192,7 @@ def format_product_analysis_response(product):
             },
             ingredient_info={
                 "ingredients_list": [],
-                "ingredients_analysis": [],
+                # "ingredients_analysis": [],
                 "ingredient_count": 0
             },
             allergen_info={
@@ -162,6 +203,11 @@ def format_product_analysis_response(product):
                 "dietary_flags": [],
                 "is_vegetarian": False,
                 "is_vegan": False
+            },
+            recommendations_info={
+                "usage_recommendations": "",
+                "ingredient_interactions": [],
+                "key_takeaway": ""
             },
             timestamp=datetime.now(tz=pytz.timezone('Asia/Kolkata')).isoformat()
         )
