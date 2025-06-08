@@ -136,7 +136,7 @@ async def create_product(
         
         # Check if the analysis results are valid
         analysis_results = results.get("overall_analysis", {})
-        overall_safety_score = analysis_results.get("overall_safety_score", 0)
+        overall_safety_score = analysis_results.get("overall_safety_score", 5)
         suitable_diet_types = analysis_results.get("suitable_diet_types", [])
         allergy_warnings = analysis_results.get("allergy_warnings", [])
         usage_recommendations = analysis_results.get("usage_recommendations", "")

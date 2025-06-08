@@ -33,7 +33,7 @@ async def add_target_to_vuforia(image_name: str, image_path: str) -> str:
         # Create payload
         payload = {
             "name": image_name,
-            "width": 1.0,  # Default width in scene units
+            "width": 150.0,  # Default width in scene units
             "image": image_base64,
             "active_flag": True,
         }

@@ -59,7 +59,7 @@ User has the following preferences:
 
 You are an expert food scientist and nutritionist analyzing a product's ingredients.
 Based on the detailed information about each ingredient below, provide a comprehensive
-analysis that would be helpful for a consumer viewing this in an AR application.
+analysis that would be helpful for a consumer viewing this while shopping and using that product.
 
 ## INGREDIENTS INFORMATION:
 {''.join(ingredients_summary)}
@@ -67,7 +67,7 @@ analysis that would be helpful for a consumer viewing this in an AR application.
 {user_context}
 
 ## REQUIRED ANALYSIS:
-1. Overall Safety Score (1-10): Calculate this based on individual ingredient safety scores
+1. Overall Safety Score (1-10): Calculate this based on individual ingredient safety scores 1 means product is not safe at all (like a toxin) and 10 means product is completely safe
 2. Suitable Diet Types: Determine if this product is for vegan, vegetarian, or Non-Vegetarian
 3. Allergy Warnings: Flag any potential allergens present related to food not more than 5 combine if needed
 4. Usage Recommendations: Provide safe consumption limits or usage guidance
