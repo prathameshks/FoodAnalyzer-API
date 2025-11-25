@@ -61,6 +61,10 @@ DUCKDUCKGO_MAX_RETRIES = int(os.getenv("DUCKDUCKGO_MAX_RETRIES", 2))
 SEND_FAKE_TARGET = os.getenv("SEND_FAKE_TARGET", False) == "true"
 FAKE_TARGET_IMAGE_NAME = os.getenv("FAKE_TARGET_IMAGE_NAME", "detected_Snack_0.13_db8318a668504073ad5fd0677187d305.jpg")
 
+# CORS configuration - comma-separated list of allowed origins
+# Use "*" for development, but set specific domains for production
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
+
 # Define Required Environment Variables and show error if not set
 required_env_vars = {
     "LLM_API_KEY":LLM_API_KEY,

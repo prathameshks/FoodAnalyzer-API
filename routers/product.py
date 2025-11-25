@@ -266,7 +266,7 @@ async def process_image_endpoint(image: UploadFile = File(...), db: Session = De
     except HTTPException:
         raise
     except Exception as e:
-        log_error(f"Error processing image: {e}", e)
+        log_error(f"Error processing image: {type(e).__name__}", e)
         raise HTTPException(status_code=500, detail="Error processing image")
 
 

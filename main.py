@@ -12,7 +12,7 @@ import uvicorn
 from pathlib import Path
 import tensorflow as tf
 import tensorflow_hub as hub
-from env import PORT
+from env import PORT, CORS_ORIGINS
 from logger_manager import log_info
 
 
@@ -40,10 +40,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
+# Configure CORS - origins configurable via environment variable
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
