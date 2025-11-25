@@ -195,19 +195,37 @@ async def create_product(
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# Maximum file size: 10MB
+MAX_FILE_SIZE = 10 * 1024 * 1024
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+
 @router.post("/process_image")
 async def process_image_endpoint(image: UploadFile = File(...), db: Session = Depends(get_db), request: Request = None):
     """
     Receives an image file, performs object detection, and returns information about detected objects.
     """
     log_info("Process image endpoint called")
+    
+    # Validate content type
+    if image.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_CONTENT_TYPES)}"
+        )
+    
     try:
-        # Read image from the uploaded file
+        # Read image from the uploaded file with size limit
         image_data = await image.read()
-        image = Image.open(io.BytesIO(image_data)).convert("RGB")
+        if len(image_data) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB"
+            )
+        
+        pil_image = Image.open(io.BytesIO(image_data)).convert("RGB")
 
         # Run object detection with the request object
-        results, image_np = run_object_detection(image, request)
+        results, image_np = run_object_detection(pil_image, request)
 
         # Get filtered class boxes
         box, class_name, score = get_filtered_class_boxes(results)
@@ -245,9 +263,11 @@ async def process_image_endpoint(image: UploadFile = File(...), db: Session = De
             "image_name": cropped_image_name,
             "detected": True
         })
+    except HTTPException:
+        raise
     except Exception as e:
         log_error(f"Error processing image: {e}", e)
-        raise HTTPException(status_code=500, detail=f"Error processing image: {e}")
+        raise HTTPException(status_code=500, detail="Error processing image")
 
 
 @router.get("/find_barcode")
@@ -265,8 +285,6 @@ async def find_product_by_barcode(barcode_number: str):
             return JSONResponse({"found": found, "product_name": product_name, "ingredients": ingredients})
         else:
             return JSONResponse({"found": found, "product_name": None, "ingredients": []}, status_code=404)
-            # Or raise HTTPException if you prefer
-            raise HTTPException(status_code=404, detail=f"Product not found for barcode: {barcode_number}")
     except Exception as e:
         log_error(f"Error fetching product data for barcode {barcode_number}: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching product data: {e}")
@@ -275,19 +293,26 @@ async def find_product_by_barcode(barcode_number: str):
 @router.get("/get_image/{image_name}")
 async def get_image(image_name: str):
     """Endpoint to retrieve an image by its name."""
-    image_path = os.path.join(UPLOADED_IMAGES_DIR, image_name)
+    # Sanitize image_name to prevent path traversal attacks
+    safe_image_name = os.path.basename(image_name)
+    if safe_image_name != image_name or '..' in image_name:
+        return JSONResponse({"error": "Invalid image name"}, status_code=400)
+    
+    image_path = os.path.join(UPLOADED_IMAGES_DIR, safe_image_name)
     if os.path.exists(image_path):
         return FileResponse(image_path, media_type="image/jpeg")
     else:
         return JSONResponse({"error": "Image not found"}, status_code=404)
         
     
-# In your API, add an endpoint like:
 @router.get("/marker/{vuforia_id}")
 async def get_product_by_marker(vuforia_id: str, db: Session = Depends(get_db)):
+    """Retrieve product by Vuforia marker ID."""
     marker = db.query(Marker).filter(Marker.vuforia_id == vuforia_id).first()
     if not marker:
         raise HTTPException(status_code=404, detail="Target not found")
     
     product = db.query(Product).filter(Product.id == marker.product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
     return product
